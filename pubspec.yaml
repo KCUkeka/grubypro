@@ -1,0 +1,45 @@
+name: grubypro
+description: "Grocery/Pantry/Recipe project."
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  sqflite: ^2.3.0
+  intl: ^0.18.1
+  shared_preferences: ^2.5.3
+  permission_handler: ^12.0.0+1
+  flutter_typeahead: ^5.2.0
+  path: ^1.9.1
+  drop_down_list: ^2.0.0
+  path_provider: ^2.1.5
+  csv: ^6.0.0
+  cupertino_icons: ^1.0.8
+  supabase_flutter: ^2.9.1
+  flutter_dotenv: ^5.2.1
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: ^0.14.4
+  flutter_lints: ^5.0.0
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "lib/img/gruby_pro.png"  
+  min_sdk_android: 21 
+flutter:
+  assets:
+    - .env
+    - lib/img/gruby.png
+    - lib/img/paypro_blue.png
+
+  uses-material-design: true
