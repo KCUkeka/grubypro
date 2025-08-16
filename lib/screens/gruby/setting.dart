@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:grubypro/screens/gruby/grubyhome.dart';
 import 'package:grubypro/screens/paypro/bill_screen.dart';
 import 'package:grubypro/screens/landing_page.dart';
+import 'package:grubypro/screens/paypro/paypro_home.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -80,25 +82,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: ListView(
         children: [
-          // Shopping List Section
-          
-          // _buildSectionHeader('GRUBY'),
-          // _buildSettingsTile(
-          //   icon: Icons.shopping_bag_outlined,
-          //   iconColor: Colors.green,
-          //   title: 'Shopping Lists',
-          //   subtitle: 'View and restore archived shopping items',
-          //   hasArrow: true,
-          //   onTap: () {
-          //     Navigator.push(
-          //       context,
-          //       MaterialPageRoute(builder: (_) => const BillsScreen(showArchived: true)),
-          //     );
-          //   },
-          // ),
-          const SizedBox(height: 24),
-          // Manage Bills
+          // GRUBY Section
+          _buildSectionHeader('GRUBY'),
+          _buildSettingsTile(
+            icon: Icons.kitchen_outlined,
+            iconColor: Colors.green,
+            title: 'Gruby Dashboard',
+            subtitle: 'Go to pantry and shopping list management',
+            hasArrow: true,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const GrubyHome()),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // PAYPRO Section
           _buildSectionHeader('PAYPRO'),
+          _buildSettingsTile(
+            icon: Icons.receipt_long,
+            iconColor: Colors.blue,
+            title: 'Paypro',
+            subtitle: 'View and manage current bills',
+            hasArrow: true,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PayproHomeScreen()),
+              );
+            },
+          ),
           _buildSettingsTile(
             icon: Icons.receipt_long,
             iconColor: Colors.blueGrey,
@@ -108,11 +123,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const BillsScreen(showArchived: true)),
+                MaterialPageRoute(
+                  builder: (_) => const BillsScreen(showArchived: true),
+                ),
               );
             },
           ),
-
+        
           // NOTIFICATIONS Section
           _buildSectionHeader('NOTIFICATIONS'),
           _buildSettingsTile(
@@ -162,18 +179,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // DATA Section
-
-          // _buildSectionHeader('DATA'),
-          // _buildSettingsTile(
-          //   icon: Icons.delete_outline,
-          //   iconColor: Colors.red,
-          //   title: 'Clear All Data',
-          //   subtitle: 'Delete all shopping lists and\npantry items',
-          //   hasArrow: true,
-          //   onTap: _showClearDataDialog,
-          // ),
         ],
       ),
     );

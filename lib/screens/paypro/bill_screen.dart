@@ -19,6 +19,9 @@ class _BillsScreenState extends State<BillsScreen> {
   bool _isLoading = true;
   bool _isRefreshing = false;
   final ScrollController _horizontalScrollController = ScrollController();
+  double get _totalAmountDue {
+  return _bills.fold(0, (sum, bill) => sum + (bill.paymentMade ? 0 : bill.amount));
+}
 
   @override
   void initState() {
@@ -210,156 +213,192 @@ class _BillsScreenState extends State<BillsScreen> {
   // Sort bills by due date for prioritization
   _bills.sort((a, b) => a.dueDate.compareTo(b.dueDate));
 
-  return ListView.builder(
-    padding: const EdgeInsets.all(16),
-    itemCount: _bills.length,
-    itemBuilder: (context, index) {
-      final bill = _bills[index];
-
-      return Dismissible(
-        key: Key(bill.id),
-        direction: DismissDirection.endToStart,
-        background: Container(
-          color: widget.showArchived ? Colors.red : Colors.blue,
-          alignment: Alignment.centerRight,
-          padding: const EdgeInsets.only(right: 16),
-          child: Icon(
-            widget.showArchived ? Icons.delete : Icons.archive,
-            color: Colors.white,
-          ),
+  return Column(
+    children: [
+      Expanded(
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: _bills.length,
+          itemBuilder: (context, index) {
+            final bill = _bills[index];
+            return _buildBillItem(bill);
+          },
         ),
-        confirmDismiss: (direction) async {
-          return await showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Confirm'),
-              content: Text(
-                  'Are you sure you want to ${widget.showArchived ? 'delete' : 'archive'} this bill?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Yes'),
-                ),
-              ],
-            ),
-          );
-        },
-        onDismissed: (direction) {
-          if (widget.showArchived) {
-            _deleteBill(bill);
-          } else {
-            _archiveBill(bill);
-          }
-        },
-        child: Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          color: !bill.paymentMade && bill.dueDate.isBefore(DateTime.now())
-              ? Colors.red.withOpacity(0.1)
-              : Colors.white,
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: Icon(
-              bill.paymentMade ? Icons.check_circle : Icons.radio_button_unchecked,
-              color: bill.paymentMade ? Colors.green : Colors.grey,
-              size: 24,
-            ),
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    bill.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                if (bill.autoPay)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'Auto Pay',
-                      style: TextStyle(color: Colors.green, fontSize: 12),
-                    ),
-                  ),
-              ],
-            ),
-            subtitle: RichText(
-              text: TextSpan(
-                style: const TextStyle(fontSize: 14, color: Colors.black),
-                children: [
-                  TextSpan(
-                    text:
-                        'Amount: \$${bill.amount.toStringAsFixed(2)} • Due: ${dateFormatter.format(bill.dueDate)}',
-
-                  ),
-                  if (!bill.paymentMade && bill.dueDate.isBefore(DateTime.now()))
-                    const TextSpan(
-                      text: ' (Overdue)',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                  if (bill.paymentMade)
-                    TextSpan(
-                      text:
-                          '\nPaid on: ${bill.paymentDate != null ? dateFormatter.format(bill.paymentDate!) : "-"}',
-
-                    ),
-                ],
+      ),
+      // Total amount due section
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          border: Border(top: BorderSide(color: Colors.grey[200]!)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Total Amount Due:',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            trailing: PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _showEditBillModal(bill);
-                } else if (value == 'archive') {
-                  _archiveBill(bill);
-                } else if (value == 'restore') {
-                  _unarchiveBill(bill);
-                } else if (value == 'delete') {
-                  _showDeleteConfirmation(bill);
-                }
-              },
-              itemBuilder: (context) {
-                if (widget.showArchived) {
-                  return [
-                    const PopupMenuItem(
-                      value: 'restore',
-                      child: Text('Restore'),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Text(
-                        'Delete',
-                        style: TextStyle(color: Colors.red),
-                      ),
-                    ),
-                  ];
-                } else {
-                  return [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Text('Edit'),
-                    ),
-                    const PopupMenuItem(
-                      value: 'archive',
-                      child: Text('Archive'),
-                    ),
-                  ];
-                }
-              },
+            Text(
+              '\$${_totalAmountDue.toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
+              ),
             ),
-          ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+// Extracted bill item widget for better readability
+Widget _buildBillItem(Bill bill) {
+  return Dismissible(
+    key: Key(bill.id),
+    direction: DismissDirection.endToStart,
+    background: Container(
+      color: widget.showArchived ? Colors.red : Colors.blue,
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.only(right: 16),
+      child: Icon(
+        widget.showArchived ? Icons.delete : Icons.archive,
+        color: Colors.white,
+      ),
+    ),
+    confirmDismiss: (direction) async {
+      return await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirm'),
+          content: Text(
+              'Are you sure you want to ${widget.showArchived ? 'delete' : 'archive'} this bill?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Yes'),
+            ),
+          ],
         ),
       );
     },
+    onDismissed: (direction) {
+      if (widget.showArchived) {
+        _deleteBill(bill);
+      } else {
+        _archiveBill(bill);
+      }
+    },
+    child: Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: !bill.paymentMade && bill.dueDate.isBefore(DateTime.now())
+          ? Colors.red.withOpacity(0.1)
+          : Colors.white,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Icon(
+          bill.paymentMade ? Icons.check_circle : Icons.radio_button_unchecked,
+          color: bill.paymentMade ? Colors.green : Colors.grey,
+          size: 24,
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                bill.name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            if (bill.autoPay)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Auto Pay',
+                  style: TextStyle(color: Colors.green, fontSize: 12),
+                ),
+              ),
+          ],
+        ),
+        subtitle: RichText(
+          text: TextSpan(
+            style: const TextStyle(fontSize: 14, color: Colors.black),
+            children: [
+              TextSpan(
+                text:
+                    'Amount: \$${bill.amount.toStringAsFixed(2)} • Due: ${dateFormatter.format(bill.dueDate)}',
+              ),
+              if (!bill.paymentMade && bill.dueDate.isBefore(DateTime.now()))
+                const TextSpan(
+                  text: ' (Overdue)',
+                  style: TextStyle(color: Colors.red),
+                ),
+              if (bill.paymentMade)
+                TextSpan(
+                  text:
+                      '\nPaid on: ${bill.paymentDate != null ? dateFormatter.format(bill.paymentDate!) : "-"}',
+                ),
+            ],
+          ),
+        ),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) {
+            if (value == 'edit') {
+              _showEditBillModal(bill);
+            } else if (value == 'archive') {
+              _archiveBill(bill);
+            } else if (value == 'restore') {
+              _unarchiveBill(bill);
+            } else if (value == 'delete') {
+              _showDeleteConfirmation(bill);
+            }
+          },
+          itemBuilder: (context) {
+            if (widget.showArchived) {
+              return [
+                const PopupMenuItem(
+                  value: 'restore',
+                  child: Text('Restore'),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Text(
+                    'Delete',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ];
+            } else {
+              return [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Text('Edit'),
+                ),
+                const PopupMenuItem(
+                  value: 'archive',
+                  child: Text('Archive'),
+                ),
+              ];
+            }
+          },
+        ),
+      ),
+    ),
   );
 }
 
@@ -403,6 +442,12 @@ class _BillsScreenState extends State<BillsScreen> {
           },
         ),
         actions: [
+          if (!widget.showArchived) // Only show add button for active bills
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _showAddBillModal,
+            tooltip: 'Add Bill',
+          ),
           IconButton(onPressed: _loadBills, icon: const Icon(Icons.refresh)),
         ],
       ),
@@ -413,17 +458,9 @@ class _BillsScreenState extends State<BillsScreen> {
                 onRefresh: _onRefresh,
                 child: _bills.isEmpty ? _buildEmptyState() : _buildBillList(),
               ),
-      floatingActionButton:
-          widget.showArchived
-              ? null
-              : FloatingActionButton(
-                onPressed: _showAddBillModal,
-                tooltip: 'Add Bill',
-                backgroundColor: Colors.green,
-                child: const Icon(Icons.add),
-              ),
-    );
-  }
+      
+  );
+}
 }
 
 class AddBillForm extends StatefulWidget {

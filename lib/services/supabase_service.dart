@@ -96,16 +96,42 @@ class SupabaseService {
     await _client.from('bills').insert(bill.toJson());
   }
 
-  // ─── Get Bill  ────────────────────────────────────────────
-  Future<List<Bill>> getBills({bool archived = false}) async {
-    final data = await _client
-        .from('bills')
-        .select()
-        .eq('archived', archived)
-        .order('due_date');
+// ─── Get Bills with Date Range Filter ────────────────────────────────────────────
+Future<List<Bill>> getBills({
+  bool archived = false,
+  DateTime? startDate,
+  DateTime? endDate,
+}) async {
+  var query = _client.from('bills').select().eq('archived', archived);
 
-    return (data as List).map((json) => Bill.fromJson(json)).toList();
+  if (startDate != null && endDate != null) {
+    query = query
+      .gte('due_date', startDate.toIso8601String())
+      .lte('due_date', endDate.toIso8601String());
   }
+
+  final data = await query.order('due_date');
+  return (data as List).map((json) => Bill.fromJson(json)).toList();
+}
+
+// ─── Get Total Amount Due ────────────────────────────────────────────
+Future<double> getTotalAmountDue({bool includePaid = false}) async {
+  var query = _client
+      .from('bills')
+      .select('amount')
+      .eq('archived', false)
+      .eq('payment_made', false);
+
+  if (includePaid) {
+    query = query.neq('payment_made', true); // Include all unpaid bills
+  }
+
+  final data = await query;
+  final total = (data as List)
+      .fold(0.0, (sum, item) => sum + (item['amount'] as num).toDouble());
+  return total;
+}
+
 
   // ─── Update Bill  ────────────────────────────────────────────
   Future<void> updateBill(Bill bill) async {

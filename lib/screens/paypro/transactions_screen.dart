@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:grubypro/services/supabase_service.dart';
 import 'package:grubypro/models/transactions.dart';
@@ -237,54 +236,53 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Widget _buildFilters() {
-  final types = ['Amex', 'Sapphire', 'Capital 1', 'Cash', 'Freedom'];
+    final types = ['Amex', 'Sapphire', 'Capital 1', 'Cash', 'Freedom'];
 
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DropdownButtonFormField<String>(
-          value: _selectedPaymentType,
-          isExpanded: true,
-          decoration: const InputDecoration(
-            labelText: 'Filter by Payment Type',
-            border: OutlineInputBorder(),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DropdownButtonFormField<String>(
+            value: _selectedPaymentType,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Filter by Payment Type',
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('All')),
+              ...types.map((t) => DropdownMenuItem(value: t, child: Text(t))),
+            ],
+            onChanged: (val) {
+              setState(() => _selectedPaymentType = val);
+              _filterTransactions();
+            },
           ),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('All')),
-            ...types.map((t) => DropdownMenuItem(value: t, child: Text(t))),
-          ],
-          onChanged: (val) {
-            setState(() => _selectedPaymentType = val);
-            _filterTransactions();
-          },
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _pickDateRange,
-                icon: const Icon(Icons.date_range),
-                label: const Text('Date Range'),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _pickDateRange,
+                  icon: const Icon(Icons.date_range),
+                  label: const Text('Date Range'),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _exportCSV,
-                icon: const Icon(Icons.download),
-                label: const Text('Export CSV'),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _exportCSV,
+                  icon: const Icon(Icons.download),
+                  label: const Text('Export CSV'),
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
-}
-
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildSummary() {
     final total = _filteredTransactions.fold(
@@ -466,10 +464,18 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Transactions',
-        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20)),
+        title: const Text(
+          'Transactions',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
+        ),
         centerTitle: true,
         actions: [
+          // Add Transaction button
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _showAddTransactionModal,
+            tooltip: 'Add Transaction',
+          ),
           IconButton(
             onPressed: _loadTransactions,
             icon: const Icon(Icons.refresh),
@@ -496,65 +502,62 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   ],
                 ),
               ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddTransactionModal,
-        backgroundColor: Colors.green,
-        child: const Icon(Icons.add),
+    );
+  }
+
+  Widget _buildEmptyTransactionList() {
+    // Check if we have transactions but they're filtered out
+    final hasTransactions = _transactions.isNotEmpty;
+    final isFiltered =
+        _selectedPaymentType != null || _startDate != null || _endDate != null;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              hasTransactions && isFiltered
+                  ? Icons.filter_list_off
+                  : Icons.receipt_long,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              hasTransactions && isFiltered
+                  ? 'No transactions match your filters'
+                  : '0 transactions',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              hasTransactions && isFiltered
+                  ? 'Try adjusting your date range or payment type filter'
+                  : 'Tap the + button to add a transaction',
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            if (hasTransactions && isFiltered) ...[
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _selectedPaymentType = null;
+                    _startDate = null;
+                    _endDate = null;
+                  });
+                  _filterTransactions();
+                },
+                child: const Text('Clear Filters'),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
-  Widget _buildEmptyTransactionList() {
-  // Check if we have transactions but they're filtered out
-  final hasTransactions = _transactions.isNotEmpty;
-  final isFiltered = _selectedPaymentType != null || _startDate != null || _endDate != null;
-  
-  return Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            hasTransactions && isFiltered 
-                ? Icons.filter_list_off 
-                : Icons.receipt_long,
-            size: 64,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            hasTransactions && isFiltered
-                ? 'No transactions match your filters'
-                : '0 transactions',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            hasTransactions && isFiltered
-                ? 'Try adjusting your date range or payment type filter'
-                : 'Tap the + button to add a transaction',
-            style: Theme.of(context).textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-          if (hasTransactions && isFiltered) ...[
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _selectedPaymentType = null;
-                  _startDate = null;
-                  _endDate = null;
-                });
-                _filterTransactions();
-              },
-              child: const Text('Clear Filters'),
-            ),
-          ],
-        ],
-      ),
-    ),
-  );
-}
 }
 
 class AddTransactionForm extends StatefulWidget {

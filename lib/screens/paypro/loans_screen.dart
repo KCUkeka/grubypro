@@ -10,7 +10,10 @@ class LoansScreen extends StatefulWidget {
 }
 
 // Helper currency format
-final NumberFormat currencyFormatter = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+final NumberFormat currencyFormatter = NumberFormat.currency(
+  symbol: '\$',
+  decimalDigits: 2,
+);
 
 // LoanOverviewScreen class:
 class LoanOverviewScreen extends StatefulWidget {
@@ -41,12 +44,12 @@ class _LoanOverviewScreenState extends State<LoanOverviewScreen> {
     setState(() => _isLoading = true);
     try {
       Map<String, List<Map<String, dynamic>>> history = {};
-      
+
       for (Loan loan in widget.loans) {
         final payments = await SupabaseService().getLoanPaymentHistory(loan.id);
         history[loan.id] = payments;
       }
-      
+
       setState(() {
         _paymentHistory = history;
         _isLoading = false;
@@ -65,62 +68,76 @@ class _LoanOverviewScreenState extends State<LoanOverviewScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: _EditPaymentForm(
-          payment: payment,
-          loan: loan,
-          onPaymentUpdated: () {
-            _loadPaymentHistory();
-            widget.onLoanUpdated();
-          },
-        ),
-      ),
+      builder:
+          (_) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: _EditPaymentForm(
+              payment: payment,
+              loan: loan,
+              onPaymentUpdated: () {
+                _loadPaymentHistory();
+                widget.onLoanUpdated();
+              },
+            ),
+          ),
     );
   }
 
   void _showDeletePaymentConfirmation(Map<String, dynamic> payment, Loan loan) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Payment'),
-        content: Text('Are you sure you want to delete this payment of ${currencyFormatter.format(payment['payment_amount'])}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Payment'),
+            content: Text(
+              'Are you sure you want to delete this payment of ${currencyFormatter.format(payment['payment_amount'])}?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  try {
+                    await SupabaseService().deletePayment(payment['id']);
+                    _loadPaymentHistory();
+                    widget.onLoanUpdated();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Payment deleted successfully'),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error deleting payment: $e')),
+                      );
+                    }
+                  }
+                },
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                await SupabaseService().deletePayment(payment['id']);
-                _loadPaymentHistory();
-                widget.onLoanUpdated();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Payment deleted successfully')),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error deleting payment: $e')),
-                  );
-                }
-              }
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
     );
   }
 
   Widget _buildLoanCard(Loan loan) {
     final payments = _paymentHistory[loan.id] ?? [];
-    final totalPaid = payments.fold<double>(0, (sum, payment) => sum + (payment['payment_amount'] as num).toDouble());
-    
+    final totalPaid = payments.fold<double>(
+      0,
+      (sum, payment) => sum + (payment['payment_amount'] as num).toDouble(),
+    );
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ExpansionTile(
@@ -154,14 +171,21 @@ class _LoanOverviewScreenState extends State<LoanOverviewScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Total: ${currencyFormatter.format(loan.totalAmount)}'),
-                Text('Paid: ${currencyFormatter.format(totalPaid)}', 
-     style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                Text(
+                  'Paid: ${currencyFormatter.format(totalPaid)}',
+                  style: const TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Remaining: ${currencyFormatter.format(loan.totalAmount - totalPaid)}'),
+                Text(
+                  'Remaining: ${currencyFormatter.format(loan.totalAmount - totalPaid)}',
+                ),
                 if (loan.interestRate != null)
                   Text('Rate: ${loan.interestRate!.toStringAsFixed(2)}%'),
               ],
@@ -175,7 +199,9 @@ class _LoanOverviewScreenState extends State<LoanOverviewScreen> {
               child: Text('No payments recorded yet'),
             )
           else
-            ...payments.map((payment) => _buildPaymentTile(payment, loan)).toList(),
+            ...payments
+                .map((payment) => _buildPaymentTile(payment, loan))
+                .toList(),
         ],
       ),
     );
@@ -184,7 +210,7 @@ class _LoanOverviewScreenState extends State<LoanOverviewScreen> {
   Widget _buildPaymentTile(Map<String, dynamic> payment, Loan loan) {
     final amount = (payment['payment_amount'] as num).toDouble();
     final date = DateTime.parse(payment['payment_date']);
-    
+
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
       leading: CircleAvatar(
@@ -196,8 +222,12 @@ class _LoanOverviewScreenState extends State<LoanOverviewScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Date: ${DateFormat('MMM dd, yyyy').format(date)}'),
-          if (payment['notes'] != null && payment['notes'].toString().isNotEmpty)
-            Text('Note: ${payment['notes']}', style: const TextStyle(fontStyle: FontStyle.italic)),
+          if (payment['notes'] != null &&
+              payment['notes'].toString().isNotEmpty)
+            Text(
+              'Note: ${payment['notes']}',
+              style: const TextStyle(fontStyle: FontStyle.italic),
+            ),
         ],
       ),
       trailing: PopupMenuButton<String>(
@@ -208,13 +238,14 @@ class _LoanOverviewScreenState extends State<LoanOverviewScreen> {
             _showDeletePaymentConfirmation(payment, loan);
           }
         },
-        itemBuilder: (context) => [
-          const PopupMenuItem(value: 'edit', child: Text('Edit')),
-          const PopupMenuItem(
-            value: 'delete',
-            child: Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
+        itemBuilder:
+            (context) => [
+              const PopupMenuItem(value: 'edit', child: Text('Edit')),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Text('Delete', style: TextStyle(color: Colors.red)),
+              ),
+            ],
       ),
     );
   }
@@ -223,8 +254,10 @@ class _LoanOverviewScreenState extends State<LoanOverviewScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Loan Overview',
-        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20)),
+        title: const Text(
+          'Loan Overview',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
+        ),
         centerTitle: true,
         actions: [
           IconButton(
@@ -233,18 +266,17 @@ class _LoanOverviewScreenState extends State<LoanOverviewScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : widget.loans.isEmpty
-              ? const Center(
-                  child: Text('No loans found'),
-                )
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : widget.loans.isEmpty
+              ? const Center(child: Text('No loans found'))
               : ListView.builder(
-                  itemCount: widget.loans.length,
-                  itemBuilder: (context, index) {
-                    return _buildLoanCard(widget.loans[index]);
-                  },
-                ),
+                itemCount: widget.loans.length,
+                itemBuilder: (context, index) {
+                  return _buildLoanCard(widget.loans[index]);
+                },
+              ),
     );
   }
 }
@@ -310,9 +342,9 @@ class _EditPaymentFormState extends State<_EditPaymentForm> {
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating payment: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error updating payment: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -341,25 +373,29 @@ class _EditPaymentFormState extends State<_EditPaymentForm> {
                 prefixText: '\$',
               ),
               keyboardType: TextInputType.number,
-              validator: (val) => val == null || val.isEmpty
-                  ? 'Required'
-                  : double.tryParse(val) == null
-                      ? 'Enter valid amount'
-                      : null,
-              onChanged: (val) => paymentAmount = double.tryParse(val) ?? paymentAmount,
+              validator:
+                  (val) =>
+                      val == null || val.isEmpty
+                          ? 'Required'
+                          : double.tryParse(val) == null
+                          ? 'Enter valid amount'
+                          : null,
+              onChanged:
+                  (val) =>
+                      paymentAmount = double.tryParse(val) ?? paymentAmount,
             ),
             const SizedBox(height: 16),
             ListTile(
-              title: Text('Date: ${DateFormat('yyyy-MM-dd').format(paymentDate)}'),
+              title: Text(
+                'Date: ${DateFormat('yyyy-MM-dd').format(paymentDate)}',
+              ),
               trailing: const Icon(Icons.calendar_today),
               onTap: _pickDate,
             ),
             const SizedBox(height: 16),
             TextFormField(
               initialValue: notes,
-              decoration: const InputDecoration(
-                labelText: 'Notes (Optional)',
-              ),
+              decoration: const InputDecoration(labelText: 'Notes (Optional)'),
               onChanged: (val) => notes = val,
             ),
             const SizedBox(height: 24),
@@ -369,9 +405,10 @@ class _EditPaymentFormState extends State<_EditPaymentForm> {
                 backgroundColor: Colors.blue,
                 minimumSize: const Size(double.infinity, 48),
               ),
-              child: _isSaving
-                  ? const CircularProgressIndicator()
-                  : const Text('Update Payment'),
+              child:
+                  _isSaving
+                      ? const CircularProgressIndicator()
+                      : const Text('Update Payment'),
             ),
           ],
         ),
@@ -397,7 +434,7 @@ class _LoansScreenState extends State<LoansScreen> {
     setState(() => _isLoading = true);
     try {
       List<Loan> loans = await SupabaseService().getLoans();
-      
+
       setState(() {
         _loans = loans;
         _isLoading = false;
@@ -409,9 +446,9 @@ class _LoansScreenState extends State<LoansScreen> {
         _isRefreshing = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading loans: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading loans: $e')));
       }
     }
   }
@@ -434,13 +471,14 @@ class _LoansScreenState extends State<LoansScreen> {
   void _showAddLoanModal([Loan? existingLoan]) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => _LoanEntryForm(
-          existingLoan: existingLoan,
-          onLoanSaved: () {
-            _loadLoans();
-            _loadStatistics();
-          },
-        ),
+        builder:
+            (context) => _LoanEntryForm(
+              existingLoan: existingLoan,
+              onLoanSaved: () {
+                _loadLoans();
+                _loadStatistics();
+              },
+            ),
       ),
     );
   }
@@ -449,133 +487,171 @@ class _LoansScreenState extends State<LoansScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: _PaymentForm(
-          loan: loan,
-          onPaymentMade: () {
-            _loadLoans();
-            _loadStatistics();
-          },
-        ),
-      ),
+      builder:
+          (_) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: _PaymentForm(
+              loan: loan,
+              onPaymentMade: () {
+                _loadLoans();
+                _loadStatistics();
+              },
+            ),
+          ),
     );
   }
 
-// View Loan overview
+  // View Loan overview
   void _showLoanOverviewScreen() {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (context) => LoanOverviewScreen(
-        loans: _loans,
-        onLoanUpdated: () {
-          _loadLoans();
-          _loadStatistics();
-        },
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (context) => LoanOverviewScreen(
+              loans: _loans,
+              onLoanUpdated: () {
+                _loadLoans();
+                _loadStatistics();
+              },
+            ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   void _showDeleteConfirmation(Loan loan) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Loan'),
-        content: Text('Are you sure you want to delete "${loan.name}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Loan'),
+            content: Text('Are you sure you want to delete "${loan.name}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  try {
+                    await SupabaseService().deleteLoan(loan.id);
+                    _loadLoans();
+                    _loadStatistics();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Loan deleted successfully'),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error deleting loan: $e')),
+                      );
+                    }
+                  }
+                },
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                await SupabaseService().deleteLoan(loan.id);
-                _loadLoans();
-                _loadStatistics();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Loan deleted successfully')),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error deleting loan: $e')),
-                  );
-                }
-              }
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
     );
   }
 
   Widget _buildStatisticsCard() {
-  if (_statistics.isEmpty) return const SizedBox.shrink();
-  
-  return Card(
-    margin: const EdgeInsets.all(16),
-    child: InkWell(
-      onTap: () => _showLoanOverviewScreen(),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Loan Overview',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildStatItem('Total Debt', currencyFormatter.format(_statistics['totalDebt'] ?? 0)),
-                _buildStatItem('Min Payments', currencyFormatter.format(_statistics['totalMinimumPayments'] ?? 0)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildStatItem('Total Paid', currencyFormatter.format(_statistics['totalPaid'] ?? 0)),
-                _buildStatItem('Remaining', currencyFormatter.format(_statistics['totalRemaining'] ?? 0)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildStatItem('Highest Rate', '${_statistics['highestInterestRate']?.toStringAsFixed(2) ?? '0.00'}%'),
-                _buildStatItem('Avg Rate', '${_statistics['averageInterestRate']?.toStringAsFixed(2) ?? '0.00'}%'),
-              ],
-            ),
-          ],
+    if (_statistics.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: InkWell(
+        onTap: () => _showLoanOverviewScreen(),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Loan Overview',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildStatItem(
+                    'Total Debt',
+                    currencyFormatter.format(_statistics['totalDebt'] ?? 0),
+                  ),
+                  _buildStatItem(
+                    'Min Payments',
+                    currencyFormatter.format(
+                      _statistics['totalMinimumPayments'] ?? 0,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildStatItem(
+                    'Total Paid',
+                    currencyFormatter.format(_statistics['totalPaid'] ?? 0),
+                  ),
+                  _buildStatItem(
+                    'Remaining',
+                    currencyFormatter.format(
+                      _statistics['totalRemaining'] ?? 0,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildStatItem(
+                    'Highest Rate',
+                    '${_statistics['highestInterestRate']?.toStringAsFixed(2) ?? '0.00'}%',
+                  ),
+                  _buildStatItem(
+                    'Avg Rate',
+                    '${_statistics['averageInterestRate']?.toStringAsFixed(2) ?? '0.00'}%',
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   Widget _buildStatItem(String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
       ],
     );
   }
@@ -601,7 +677,10 @@ class _LoansScreenState extends State<LoansScreen> {
                 ),
                 if (loan.isPriority)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.red[100],
                       borderRadius: BorderRadius.circular(12),
@@ -620,13 +699,19 @@ class _LoansScreenState extends State<LoansScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Total: ${currencyFormatter.format(loan.totalAmount)}'),
-                    if (loan.dueDate != null) 
-                      Text('Due: ${DateFormat('yyyy-MM-dd').format(loan.dueDate!)}'),
+                    Text(
+                      'Total: ${currencyFormatter.format(loan.totalAmount)}',
+                    ),
+                    if (loan.dueDate != null)
+                      Text(
+                        'Due: ${DateFormat('yyyy-MM-dd').format(loan.dueDate!)}',
+                      ),
                   ],
                 ),
                 if (loan.minimumPayment != null)
-                  Text('Min Payment: ${currencyFormatter.format(loan.minimumPayment!)}'),
+                  Text(
+                    'Min Payment: ${currencyFormatter.format(loan.minimumPayment!)}',
+                  ),
                 if (loan.interestRate != null)
                   Text('Interest: ${loan.interestRate!.toStringAsFixed(2)}%'),
                 if (loan.notes != null)
@@ -653,14 +738,21 @@ class _LoansScreenState extends State<LoansScreen> {
                   _showDeleteConfirmation(loan);
                 }
               },
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                const PopupMenuItem(value: 'payment', child: Text('Make Payment')),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Text('Delete', style: TextStyle(color: Colors.red)),
-                ),
-              ],
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    const PopupMenuItem(
+                      value: 'payment',
+                      child: Text('Make Payment'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text(
+                        'Delete',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
             ),
             onTap: () => _showAddLoanModal(loan),
           ),
@@ -673,43 +765,44 @@ class _LoansScreenState extends State<LoansScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Loans',
-        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20)),
+        title: const Text(
+          'Loans',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
+        ),
         centerTitle: true,
         actions: [
+          // Add Loan button
           IconButton(
-            onPressed: _loadLoans,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.add),
+            onPressed: _showAddLoanModal,
+            tooltip: 'Add Loan',
           ),
+          IconButton(onPressed: _loadLoans, icon: const Icon(Icons.refresh)),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _onRefresh,
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    _buildStatisticsCard(),
-                    if (_loans.isEmpty)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32),
-                          child: Text('No loans found'),
-                        ),
-                      )
-                    else
-                      _buildLoanList(),
-                    const SizedBox(height: 80), // Space for FAB
-                  ],
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                onRefresh: _onRefresh,
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildStatisticsCard(),
+                      if (_loans.isEmpty)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32),
+                            child: Text('No loans found'),
+                          ),
+                        )
+                      else
+                        _buildLoanList(),
+                      const SizedBox(height: 80), // Space for FAB
+                    ],
+                  ),
                 ),
               ),
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddLoanModal,
-        backgroundColor: Colors.green,
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }
@@ -718,7 +811,7 @@ class _LoanEntryForm extends StatefulWidget {
   final Loan? existingLoan;
   final VoidCallback onLoanSaved;
   const _LoanEntryForm({this.existingLoan, required this.onLoanSaved});
-  
+
   @override
   State<_LoanEntryForm> createState() => __LoanEntryFormState();
 }
@@ -762,9 +855,9 @@ class __LoanEntryFormState extends State<_LoanEntryForm> {
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
     if (_isSaving) return;
-    
+
     setState(() => _isSaving = true);
-    
+
     try {
       if (widget.existingLoan != null) {
         // For updating existing loan
@@ -805,14 +898,14 @@ class __LoanEntryFormState extends State<_LoanEntryForm> {
         );
         await SupabaseService().addLoan(loan);
       }
-      
+
       widget.onLoanSaved();
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving loan: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving loan: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -823,8 +916,10 @@ class __LoanEntryFormState extends State<_LoanEntryForm> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.existingLoan != null ? 'Edit Loan' : 'Add Loan',
-        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20)),
+        title: Text(
+          widget.existingLoan != null ? 'Edit Loan' : 'Add Loan',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
+        ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -838,7 +933,8 @@ class __LoanEntryFormState extends State<_LoanEntryForm> {
                 initialValue: name,
                 decoration: const InputDecoration(labelText: 'Loan Name'),
                 onChanged: (val) => name = val,
-                validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                validator:
+                    (val) => val == null || val.isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -846,7 +942,8 @@ class __LoanEntryFormState extends State<_LoanEntryForm> {
                 decoration: const InputDecoration(labelText: 'Total Amount'),
                 keyboardType: TextInputType.number,
                 onChanged: (val) => totalAmount = double.tryParse(val) ?? 0,
-                validator: (val) => totalAmount <= 0 ? 'Enter valid amount' : null,
+                validator:
+                    (val) => totalAmount <= 0 ? 'Enter valid amount' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -891,10 +988,11 @@ class __LoanEntryFormState extends State<_LoanEntryForm> {
                   backgroundColor: Colors.green,
                   minimumSize: const Size(double.infinity, 48),
                 ),
-                child: _isSaving
-                    ? const CircularProgressIndicator()
-                    : const Text('Save Loan'),
-              )
+                child:
+                    _isSaving
+                        ? const CircularProgressIndicator()
+                        : const Text('Save Loan'),
+              ),
             ],
           ),
         ),
@@ -907,7 +1005,7 @@ class _PaymentForm extends StatefulWidget {
   final Loan loan;
   final VoidCallback onPaymentMade;
   const _PaymentForm({required this.loan, required this.onPaymentMade});
-  
+
   @override
   State<_PaymentForm> createState() => _PaymentFormState();
 }
@@ -944,9 +1042,9 @@ class _PaymentFormState extends State<_PaymentForm> {
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving payment: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving payment: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -974,11 +1072,13 @@ class _PaymentFormState extends State<_PaymentForm> {
                 prefixText: '\$',
               ),
               keyboardType: TextInputType.number,
-              validator: (val) => val == null || val.isEmpty
-                  ? 'Required'
-                  : double.tryParse(val) == null
-                      ? 'Enter valid amount'
-                      : null,
+              validator:
+                  (val) =>
+                      val == null || val.isEmpty
+                          ? 'Required'
+                          : double.tryParse(val) == null
+                          ? 'Enter valid amount'
+                          : null,
               onChanged: (val) => paymentAmount = double.tryParse(val),
             ),
             const SizedBox(height: 16),
@@ -998,9 +1098,10 @@ class _PaymentFormState extends State<_PaymentForm> {
                 backgroundColor: Colors.green,
                 minimumSize: const Size(double.infinity, 48),
               ),
-              child: _isSaving
-                  ? const CircularProgressIndicator()
-                  : const Text('Record Payment'),
+              child:
+                  _isSaving
+                      ? const CircularProgressIndicator()
+                      : const Text('Record Payment'),
             ),
           ],
         ),
