@@ -20,6 +20,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<PantryItem> _pantryItems = [];
   bool _isLoading = true;
   String? _errorMessage;
+  List<PantryItem> get _lowInventoryItems {
+    return _pantryItems.where((item) => item.quantity <= 1).toList();
+  }
 
   @override
   void initState() {
@@ -146,43 +149,48 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 24),
                       // Stats Cards
                       Padding(
-  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-  child: Row(
-    children: [
-      Expanded(
-        child: _buildModernStatCard(
-          'Shopping List',
-          '${_unpurchasedGroceries.length}',
-          'items',
-          Icons.shopping_cart_outlined,
-          const Color(0xFF4CAF50),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => ShoppingListScreen()),
-            );
-          },
-        ),
-      ),
-      const SizedBox(width: 16),
-      Expanded(
-        child: _buildModernStatCard(
-          'Pantry Items',
-          '${_pantryItems.length}',
-          'items',
-          Icons.kitchen_outlined,
-          const Color(0xFF2196F3),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => PantryScreen()),
-            );
-          },
-        ),
-      ),
-    ],
-  ),
-),
+                        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _buildModernStatCard(
+                                'Shopping List',
+                                '${_unpurchasedGroceries.length}',
+                                'items',
+                                Icons.shopping_cart_outlined,
+                                const Color(0xFF4CAF50),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => ShoppingListScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildModernStatCard(
+                                'Pantry Items',
+                                '${_pantryItems.length}',
+                                'items',
+                                Icons.kitchen_outlined,
+                                const Color(0xFF2196F3),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => PantryScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 32),
 
                       // Expiring Soon Section
@@ -220,12 +228,177 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       const SizedBox(height: 24),
+                      // Low Inventory Section
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                        child: Text(
+                          'Low Inventory',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                            fontSize: 20,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+                      if (_lowInventoryItems.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                          child: _buildEmptyLowInventoryCard(),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                          child: Column(
+                            children:
+                                _lowInventoryItems
+                                    .map(
+                                      (item) =>
+                                          _buildModernLowInventoryCard(item),
+                                    )
+                                    .toList(),
+                          ),
+                        ),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
       ),
     );
   }
+
+  //Low Inventory
+  Widget _buildEmptyLowInventoryCard() {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(24.0),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.04),
+          blurRadius: 10,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF4CAF50).withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.inventory_2_outlined,
+            color: Color(0xFF4CAF50),
+            size: 32,
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Well Stocked!',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'No low inventory items. Your pantry is well stocked!',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[600],
+            height: 1.4,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+//Low Modern inventory
+Widget _buildModernLowInventoryCard(PantryItem item) {
+  return GestureDetector(
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PantryScreen(), // Navigate to PantryScreen
+        ),
+      );
+    },
+    child: Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF9500),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.category,
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              'Qty: ${item.quantity}',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _buildModernStatCard(
     String title,
