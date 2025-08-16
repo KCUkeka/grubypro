@@ -313,10 +313,6 @@ class _PantryScreenState extends State<PantryScreen> {
               color: const Color(0xFF4CAF50).withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            // child: IconButton(
-            //   icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF4CAF50)),
-            //   onPressed: _scanBarcode,
-            // ),
           ),
         ],
         bottom: PreferredSize(
@@ -552,101 +548,104 @@ class _PantryScreenState extends State<PantryScreen> {
       statusColor = const Color(0xFFFF9500);
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: statusColor != null ? Border.all(color: statusColor.withOpacity(0.3)) : null,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                if (statusColor != null) ...[
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      shape: BoxShape.circle,
+    return InkWell(
+        onTap: () => _showAddItemDialog(editItem: item),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: statusColor != null ? Border.all(color: statusColor.withOpacity(0.3)) : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  if (statusColor != null) ...[
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: Text(
+                      item.name,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                        decoration: item.isExpired ? TextDecoration.lineThrough : null,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  _buildQuantityBadge(item),
+                  const SizedBox(width: 8),
+                  _buildMoreMenu(item),
                 ],
-                Expanded(
-                  child: Text(
-                    item.name,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                      decoration: item.isExpired ? TextDecoration.lineThrough : null,
-                    ),
-                  ),
-                ),
-                _buildQuantityBadge(item),
-                const SizedBox(width: 8),
-                _buildMoreMenu(item),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    item.category,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[700],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                if (item.expiryDate != null)
-                  Text(
-                    DateFormat('MMM dd, yyyy').format(item.expiryDate!),
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: statusColor ?? Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-              ],
-            ),
-            if (item.barcode != null) ...[
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.qr_code, size: 14, color: Colors.grey[500]),
-                  const SizedBox(width: 4),
-                  Text(
-                    item.barcode!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      item.category,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 12),
+                  if (item.expiryDate != null)
+                    Text(
+                      DateFormat('MMM dd, yyyy').format(item.expiryDate!),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: statusColor ?? Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                 ],
               ),
+              if (item.barcode != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.qr_code, size: 14, color: Colors.grey[500]),
+                    const SizedBox(width: 4),
+                    Text(
+                      item.barcode!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
