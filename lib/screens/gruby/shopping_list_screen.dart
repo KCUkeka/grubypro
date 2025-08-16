@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:grubypro/screens/app_bar.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -799,7 +800,7 @@ Future<void> _undoMarkAsActive() async {
       length: 2,
       child: Scaffold(
         backgroundColor: Colors.grey[50],
-        appBar: AppBar(
+        appBar: CustomAppBar(
           title: const Text(
             'Shopping List',
             style: TextStyle(

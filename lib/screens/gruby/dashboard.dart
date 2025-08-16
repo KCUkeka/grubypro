@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:grubypro/screens/app_bar.dart';
 import 'package:grubypro/screens/gruby/pantry_screen.dart';
 import 'package:grubypro/screens/gruby/setting.dart';
 import 'package:grubypro/screens/gruby/shopping_list_screen.dart';
@@ -54,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
+      appBar: CustomAppBar(
         leading: IconButton(
           icon: const Icon(Icons.settings_outlined),
           onPressed: () {
