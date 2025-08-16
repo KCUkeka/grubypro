@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ShoppingListScreen extends StatefulWidget {
@@ -16,20 +17,171 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
   );
   final TextEditingController _unitController = TextEditingController();
 
+  // Unit types
   final List<String> _unitOptions = [
     "Stick(s)",
     "Bag(s)",
     "Box(es)",
     "Container(s)",
     "Piece(s)",
+    "Packet(s)",
+    "Dozen",
+    "Gallon",
+    "Pair",
     "Other",
   ];
+
   String? _selectedUnit;
 
   @override
   void initState() {
     super.initState();
     _loadItems();
+  }
+
+  // Adding to Pantry list
+  Future<bool> _addToPantry(Map<String, dynamic> item) async {
+    bool success = false;
+    final quantityController = TextEditingController(
+      text: item['quantity'].toString(),
+    );
+    String? selectedCategory = "Other"; // Default category
+    DateTime? selectedExpiryDate;
+
+    await showDialog(
+      context: context,
+      builder:
+          (context) => StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: Text('Add ${item['name']} to Pantry'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: quantityController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Quantity',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedCategory,
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Fruits',
+                          child: Text('Fruits'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Vegetables',
+                          child: Text('Vegetables'),
+                        ),
+                        DropdownMenuItem(value: 'Dairy', child: Text('Dairy')),
+                        DropdownMenuItem(value: 'Meat', child: Text('Meat')),
+                        DropdownMenuItem(
+                          value: 'Dry Goods',
+                          child: Text('Dry Goods'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Baking',
+                          child: Text('Baking'),
+                        ),
+                        DropdownMenuItem(value: 'Other', child: Text('Other')),
+                      ],
+                      onChanged:
+                          (value) => setState(() => selectedCategory = value),
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.now().add(
+                            const Duration(days: 7),
+                          ),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365 * 2),
+                          ),
+                        );
+                        if (picked != null) {
+                          setState(() => selectedExpiryDate = picked);
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Expiry Date (Optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              selectedExpiryDate != null
+                                  ? DateFormat(
+                                    'MMM dd, yyyy',
+                                  ).format(selectedExpiryDate!)
+                                  : 'Select date',
+                            ),
+                            Icon(Icons.calendar_today, color: Colors.grey[600]),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final quantity =
+                          int.tryParse(quantityController.text) ?? 1;
+                      if (quantity > 0) {
+                        try {
+                          await Supabase.instance.client.from('pantry_items').insert({
+                            'name': item['name'],
+                            'quantity': quantity,
+                            'category': selectedCategory,
+                            'expiry_date':
+                                selectedExpiryDate?.toIso8601String(),
+                            'added_at': DateTime.now().toIso8601String(),
+                          });
+
+                          success = true;
+                          if (mounted) {
+                            Navigator.pop(context);
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Failed to add to pantry: ${e.toString()}',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      }
+                    },
+                    child: const Text('Add to Pantry'),
+                  ),
+                ],
+              );
+            },
+          ),
+    );
+    return success;
   }
 
   Future<void> _loadItems() async {
@@ -45,6 +197,10 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
   //Plural helper function:
 
   String formatUnit(String unit, int quantity) {
+    if (unit.isEmpty) return 'Pcs';
+    // Handle units that don't change with quantity
+    final unchangeableUnits = ["Dozen", "Gallon", "Pair"];
+    if (unchangeableUnits.contains(unit)) return unit;
     // Handle irregular plurals
     final irregulars = {
       "Loaf": "Loaves",
@@ -70,8 +226,8 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
       return quantity > 1 ? "${base}es" : base;
     }
 
-    // Default: return unchanged
-    return unit;
+    // Default: return unchanged for quantity = 1, add 's' for quantity > 1
+    return quantity > 1 ? "${unit}s" : unit;
   }
 
   Future<void> _addItem() async {
@@ -79,6 +235,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     final quantityText = _quantityController.text.trim();
     final quantity = int.tryParse(quantityText) ?? 1;
 
+    // Get the base unit (without pluralization)
     String unitText =
         _selectedUnit == "Other"
             ? _unitController.text.trim()
@@ -234,118 +391,171 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
 
   @override
   Widget build(BuildContext context) {
-  return Scaffold(
-    backgroundColor: Colors.grey[50],
-    appBar: AppBar(
-      title: const Text(
-        'Shopping List',
-        style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: const Text(
+          'Shopping List',
+          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
       ),
-      backgroundColor: Colors.white,
-      elevation: 0,
-      centerTitle: true,
-    ),
-    body: Column(
-      children: [
-        Expanded(
-          child: _items.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _items.length,
-                  itemBuilder: (context, index) {
-                    final item = _items[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      elevation: 1,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => _editItem(index),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 12, horizontal: 16),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.shopping_bag_outlined,
-                                color: Colors.green,
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+      body: Column(
+        children: [
+          Expanded(
+            child:
+                _items.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _items.length,
+                      itemBuilder: (context, index) {
+                        final item = _items[index];
+                        final quantity = item['quantity'] ?? 1;
+                        final unit = item['unit'] ?? "";
+                        final formattedUnit = formatUnit(unit, quantity);
+
+                        return Dismissible(
+                          key: Key(item['id'].toString()),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            color: Colors.green,
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Icon(
+                                  Icons.kitchen,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Add to Pantry',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(width: 16),
+                              ],
+                            ),
+                          ),
+                          confirmDismiss: (direction) async {
+                            await _addToPantry(item);
+                            return false; // We'll handle dismissal in the _addToPantry method
+                          },
+                          child: Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            elevation: 1,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () => _editItem(index),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 16,
+                                ),
+                                child: Row(
                                   children: [
-                                    Text(
-                                      item['name'],
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
+                                    const Icon(
+                                      Icons.shopping_bag_outlined,
+                                      color: Colors.green,
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item['name'],
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Quantity: $quantity ${formattedUnit.isNotEmpty ? formattedUnit : ''}',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Quantity: ${item['quantity'] ?? 1} '
-                                      '${formatUnit(item['unit'] ?? "", item['quantity'] ?? 1)}',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey[600],
+                                    PopupMenuButton<String>(
+                                      icon: const Icon(
+                                        Icons.more_vert,
+                                        color: Colors.grey,
                                       ),
+                                      itemBuilder:
+                                          (context) => [
+                                            const PopupMenuItem(
+                                              value: 'edit',
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.edit,
+                                                    size: 20,
+                                                    color: Colors.grey,
+                                                  ),
+                                                  SizedBox(width: 8),
+                                                  Text('Edit'),
+                                                ],
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'delete',
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.delete,
+                                                    size: 20,
+                                                    color: Colors.red,
+                                                  ),
+                                                  SizedBox(width: 8),
+                                                  Text(
+                                                    'Delete',
+                                                    style: TextStyle(
+                                                      color: Colors.red,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                      onSelected: (value) {
+                                        if (value == 'edit') {
+                                          _editItem(index);
+                                        } else if (value == 'delete') {
+                                          _removeItem(index);
+                                        }
+                                      },
                                     ),
                                   ],
                                 ),
                               ),
-                              PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert,
-                                    color: Colors.grey),
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.edit,
-                                            size: 20, color: Colors.grey),
-                                        SizedBox(width: 8),
-                                        Text('Edit'),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.delete,
-                                            size: 20, color: Colors.red),
-                                        SizedBox(width: 8),
-                                        Text('Delete',
-                                            style: TextStyle(color: Colors.red)),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                                onSelected: (value) {
-                                  if (value == 'edit') {
-                                    _editItem(index);
-                                  } else if (value == 'delete') {
-                                    _removeItem(index);
-                                  }
-                                },
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-        ),
-        _buildInputForm(),
-      ],
-    ),
-  );
-}
+                        );
+                      },
+                    ),
+          ),
+          _buildInputForm(),
+        ],
+      ),
+    );
+  }
 
   Widget _buildEmptyState() => Center(
     child: Column(
