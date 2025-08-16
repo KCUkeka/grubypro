@@ -19,6 +19,15 @@ class _PantryScreenState extends State<PantryScreen> {
   final _categoryController = TextEditingController();
   final _quantityController = TextEditingController(text: '1');
   DateTime? _selectedExpiryDate;
+  final List<String> _categoryOptions = [
+    'Fruits',
+    'Vegetables',
+    'Dairy',
+    'Meat',
+    'Dry Goods',
+    'Baking',
+    'Other'
+  ];
 
   @override
   void initState() {
@@ -92,123 +101,145 @@ class _PantryScreenState extends State<PantryScreen> {
 
   // Add items to shoppingList
   Future<void> _addToShoppingList(PantryItem item) async {
-  final quantityController = TextEditingController(text: '1');
-  String? selectedUnit;
-  final unitController = TextEditingController();
+    final quantityController = TextEditingController(text: '1');
+    String? selectedUnit;
+    final unitController = TextEditingController();
 
-  await showDialog(
-    context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) {
-        return AlertDialog(
-          title: Text('Add ${item.name} to Shopping List'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: quantityController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Quantity',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: selectedUnit,
-                decoration: const InputDecoration(
-                  labelText: 'Unit',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'Stick(s)', child: Text('Stick(s)')),
-                  DropdownMenuItem(value: 'Bag(s)', child: Text('Bag(s)')),
-                  DropdownMenuItem(value: 'Box(es)', child: Text('Box(es)')),
-                  DropdownMenuItem(value: 'Bottle(s)', child: Text('Bottle(s)')),
-                  DropdownMenuItem(value: 'Gallon', child: Text('Gallon')),
-                  DropdownMenuItem(
-                    value: 'Container(s)', 
-                    child: Text('Container(s)'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'Piece(s)', 
-                    child: Text('Piece(s)'),
-                  ),
-                  DropdownMenuItem(value: 'Other', child: Text('Other')),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    selectedUnit = value;
-                    if (value != 'Other') {
-                      unitController.text = value ?? '';
-                    }
-                  });
-                },
-              ),
-              if (selectedUnit == 'Other')
-                Padding(
-                  padding: const EdgeInsets.only(top: 16.0),
-                  child: TextField(
-                    controller: unitController,
-                    decoration: const InputDecoration(
-                      labelText: 'Custom Unit',
-                      border: OutlineInputBorder(),
+    await showDialog(
+      context: context,
+      builder:
+          (context) => StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: Text('Add ${item.name} to Shopping List'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: quantityController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Quantity',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final quantity = int.tryParse(quantityController.text) ?? 1;
-                if (quantity > 0) {
-                  try {
-                    final unit = selectedUnit == 'Other'
-                        ? unitController.text.trim()
-                        : selectedUnit ?? item.category;
-
-                    await Supabase.instance.client.from('shopping_list').insert({
-                      'name': item.name,
-                      'quantity': quantity,
-                      'unit': unit,
-                    });
-
-                    if (mounted) {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Added $quantity ${unit.isEmpty ? item.name : '$unit of ${item.name}'} to shopping list',
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedUnit,
+                      decoration: const InputDecoration(
+                        labelText: 'Unit',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Stick(s)',
+                          child: Text('Stick(s)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Bag(s)',
+                          child: Text('Bag(s)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Box(es)',
+                          child: Text('Box(es)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Bottle(s)',
+                          child: Text('Bottle(s)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Gallon',
+                          child: Text('Gallon'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Container(s)',
+                          child: Text('Container(s)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Piece(s)',
+                          child: Text('Piece(s)'),
+                        ),
+                        DropdownMenuItem(value: 'Other', child: Text('Other')),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          selectedUnit = value;
+                          if (value != 'Other') {
+                            unitController.text = value ?? '';
+                          }
+                        });
+                      },
+                    ),
+                    if (selectedUnit == 'Other')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16.0),
+                        child: TextField(
+                          controller: unitController,
+                          decoration: const InputDecoration(
+                            labelText: 'Custom Unit',
+                            border: OutlineInputBorder(),
                           ),
-                          backgroundColor: Colors.green,
                         ),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Failed to add item: ${e.toString()}'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                }
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
-    ),
-  );
-}
+                      ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final quantity =
+                          int.tryParse(quantityController.text) ?? 1;
+                      if (quantity > 0) {
+                        try {
+                          final unit =
+                              selectedUnit == 'Other'
+                                  ? unitController.text.trim()
+                                  : selectedUnit ?? item.category;
+
+                          await Supabase.instance.client
+                              .from('shopping_list')
+                              .insert({
+                                'name': item.name,
+                                'quantity': quantity,
+                                'unit': unit,
+                              });
+
+                          if (mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Added $quantity ${unit.isEmpty ? item.name : '$unit of ${item.name}'} to shopping list',
+                                ),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Failed to add item: ${e.toString()}',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      }
+                    },
+                    child: const Text('Add'),
+                  ),
+                ],
+              );
+            },
+          ),
+    );
+  }
 
   List<PantryItem> get _filteredItems {
     return _pantryItems.where((item) {
@@ -232,7 +263,10 @@ class _PantryScreenState extends State<PantryScreen> {
   void _showAddItemDialog({String? barcode, PantryItem? editItem}) {
     if (editItem != null) {
       _nameController.text = editItem.name;
-      _categoryController.text = editItem.category;
+      _categoryController.text =
+          _categoryOptions.contains(editItem.category)
+              ? editItem.category
+              : _categoryOptions.first;
       _quantityController.text = editItem.quantity.toString();
       _selectedExpiryDate = editItem.expiryDate;
     } else {
@@ -303,10 +337,50 @@ class _PantryScreenState extends State<PantryScreen> {
                           Icons.shopping_basket_outlined,
                         ),
                         const SizedBox(height: 16),
-                        _buildTextField(
-                          _categoryController,
-                          'Category',
-                          Icons.category_outlined,
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: DropdownButtonFormField<String>(
+                              value:
+                                  _categoryController.text.isEmpty
+                                      ? null
+                                      : _categoryOptions.contains(
+                                        _categoryController.text,
+                                      )
+                                      ? _categoryController.text
+                                      : null,
+                              decoration: InputDecoration(
+                                labelText: 'Category',
+                                border: InputBorder.none,
+                                prefixIcon: Icon(
+                                  Icons.category_outlined,
+                                  size: 20,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              items:
+                                  _categoryOptions.map((category) {
+                                    return DropdownMenuItem(
+                                      value: category,
+                                      child: Text(category),
+                                    );
+                                  }).toList(),
+                              onChanged: (value) {
+                                setDialogState(() {
+                                  _categoryController.text = value ?? '';
+                                });
+                              },
+                              validator:
+                                  (value) =>
+                                      value == null
+                                          ? 'Select a category'
+                                          : null,
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 16),
                         _buildTextField(
@@ -891,7 +965,6 @@ class _PantryScreenState extends State<PantryScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       itemBuilder:
           (_) => [
-            
             PopupMenuItem(
               value: 'add_to_list',
               child: Row(
@@ -1029,7 +1102,6 @@ class _PantryScreenState extends State<PantryScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _categoryController.dispose();
     _quantityController.dispose();
     super.dispose();
   }
