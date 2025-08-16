@@ -26,7 +26,7 @@ class _PantryScreenState extends State<PantryScreen> {
     'Meat',
     'Dry Goods',
     'Baking',
-    'Other'
+    'Other',
   ];
 
   @override
@@ -572,11 +572,18 @@ class _PantryScreenState extends State<PantryScreen> {
         elevation: 0,
         centerTitle: true,
         actions: [
+          // Add Item button
           Container(
             margin: const EdgeInsets.only(right: 8),
             decoration: BoxDecoration(
               color: const Color(0xFF4CAF50).withOpacity(0.1),
               shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.add),
+              color: const Color(0xFF4CAF50),
+              onPressed: _showAddItemDialog,
+              tooltip: 'Add Pantry Item',
             ),
           ),
         ],
@@ -691,26 +698,7 @@ class _PantryScreenState extends State<PantryScreen> {
             ),
           ],
         ),
-      ),
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF4CAF50),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4CAF50).withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: FloatingActionButton(
-          onPressed: () => _showAddItemDialog(),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          child: const Icon(Icons.add, color: Colors.white, size: 28),
-        ),
-      ),
+      ),      
     );
   }
 
