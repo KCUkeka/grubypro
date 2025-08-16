@@ -9,13 +9,19 @@ class ShoppingListScreen extends StatefulWidget {
   State<ShoppingListScreen> createState() => _ShoppingListScreenState();
 }
 
-class _ShoppingListScreenState extends State<ShoppingListScreen> {
+class _ShoppingListScreenState extends State<ShoppingListScreen>
+    with SingleTickerProviderStateMixin {
   List<Map<String, dynamic>> _items = [];
+  List<Map<String, dynamic>> _purchasedItems = [];
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController(
     text: '1',
   );
   final TextEditingController _unitController = TextEditingController();
+  late TabController _tabController;
+
+  Map<String, dynamic>? _lastPurchasedItem;
+  int? _lastPurchasedIndex;
 
   // Unit types
   final List<String> _unitOptions = [
@@ -25,6 +31,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     "Container(s)",
     "Piece(s)",
     "Packet(s)",
+    "Bottle(s)",
     "Dozen",
     "Gallon",
     "Pair",
@@ -36,16 +43,151 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadItems();
+    _loadPurchasedItems();
   }
 
-  // Adding to Pantry list
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _nameController.dispose();
+    _quantityController.dispose();
+    _unitController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadItems() async {
+    final response = await Supabase.instance.client
+        .from('shopping_list')
+        .select('id, name, quantity, unit, is_purchased')
+        .eq('is_purchased', false)
+        .order('created_at', ascending: false);
+
+    setState(() {
+      _items = List<Map<String, dynamic>>.from(response);
+    });
+  }
+
+  Future<void> _undoPurchase() async {
+    if (_lastPurchasedItem == null || _lastPurchasedIndex == null) return;
+
+    await Supabase.instance.client
+        .from('shopping_list')
+        .update({'is_purchased': false})
+        .eq('id', _lastPurchasedItem!['id']);
+
+    setState(() {
+      // Remove from purchased items
+      _purchasedItems.removeWhere(
+        (item) => item['id'] == _lastPurchasedItem!['id'],
+      );
+
+      // Add back to active items at original position
+      _items.insert(_lastPurchasedIndex!, _lastPurchasedItem!);
+
+      // Clear the undo cache
+      _lastPurchasedItem = null;
+      _lastPurchasedIndex = null;
+    });
+  }
+Future<void> _undoMarkAsActive() async {
+  if (_lastPurchasedItem == null || _lastPurchasedIndex == null) return;
+
+  await Supabase.instance.client
+      .from('shopping_list')
+      .update({'is_purchased': true})
+      .eq('id', _lastPurchasedItem!['id']);
+
+  setState(() {
+    // Remove from active items
+    _items.removeWhere((item) => item['id'] == _lastPurchasedItem!['id']);
+    
+    // Add back to purchased items at original position
+    _purchasedItems.insert(_lastPurchasedIndex!, _lastPurchasedItem!);
+    
+    // Clear the undo cache
+    _lastPurchasedItem = null;
+    _lastPurchasedIndex = null;
+  });
+}
+
+  Future<void> _loadPurchasedItems() async {
+    final response = await Supabase.instance.client
+        .from('shopping_list')
+        .select('id, name, quantity, unit, is_purchased')
+        .eq('is_purchased', true)
+        .order('created_at', ascending: false);
+
+    setState(() {
+      _purchasedItems = List<Map<String, dynamic>>.from(response);
+    });
+  }
+
+  Future<void> _markAsPurchased(int index) async {
+    final item = _items[index];
+    _lastPurchasedItem = Map<String, dynamic>.from(item);
+    _lastPurchasedIndex = index;
+
+    await Supabase.instance.client
+        .from('shopping_list')
+        .update({'is_purchased': true})
+        .eq('id', item['id']);
+
+    setState(() {
+      _items.removeAt(index);
+      _purchasedItems.insert(0, item);
+    });
+    // Show undo snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${item['name']} marked as purchased'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'UNDO',
+          textColor: Colors.white,
+          onPressed: () => _undoPurchase(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _markAsActive(int index) async {
+    final item = _purchasedItems[index];
+    _lastPurchasedItem = Map<String, dynamic>.from(item); 
+    _lastPurchasedIndex = index;
+
+    await Supabase.instance.client
+        .from('shopping_list')
+        .update({'is_purchased': false})
+        .eq('id', item['id']);
+
+    setState(() {
+      _purchasedItems.removeAt(index);
+      _items.insert(0, item);
+    });
+    // Show undo snackbar
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('${item['name']} marked as active'),
+      backgroundColor: Colors.blue,
+      duration: const Duration(seconds: 3),
+      action: SnackBarAction(
+        label: 'UNDO',
+        textColor: Colors.white,
+        onPressed: () => _undoMarkAsActive(),
+      ),
+    ),
+  );
+  }
+
   Future<bool> _addToPantry(Map<String, dynamic> item) async {
     bool success = false;
     final quantityController = TextEditingController(
       text: item['quantity'].toString(),
     );
-    String? selectedCategory = "Other"; // Default category
+    String? selectedCategory = "Other";
     DateTime? selectedExpiryDate;
 
     await showDialog(
@@ -147,14 +289,16 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                           int.tryParse(quantityController.text) ?? 1;
                       if (quantity > 0) {
                         try {
-                          await Supabase.instance.client.from('pantry_items').insert({
-                            'name': item['name'],
-                            'quantity': quantity,
-                            'category': selectedCategory,
-                            'expiry_date':
-                                selectedExpiryDate?.toIso8601String(),
-                            'added_at': DateTime.now().toIso8601String(),
-                          });
+                          await Supabase.instance.client
+                              .from('pantry_items')
+                              .insert({
+                                'name': item['name'],
+                                'quantity': quantity,
+                                'category': selectedCategory,
+                                'expiry_date':
+                                    selectedExpiryDate?.toIso8601String(),
+                                'added_at': DateTime.now().toIso8601String(),
+                              });
 
                           success = true;
                           if (mounted) {
@@ -184,24 +328,11 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     return success;
   }
 
-  Future<void> _loadItems() async {
-    final response = await Supabase.instance.client
-        .from('shopping_list')
-        .select('id, name, quantity, unit')
-        .order('created_at', ascending: false);
-
-    setState(() {
-      _items = List<Map<String, dynamic>>.from(response);
-    });
-  }
-  //Plural helper function:
-
   String formatUnit(String unit, int quantity) {
     if (unit.isEmpty) return 'Pcs';
-    // Handle units that don't change with quantity
     final unchangeableUnits = ["Dozen", "Gallon", "Pair"];
     if (unchangeableUnits.contains(unit)) return unit;
-    // Handle irregular plurals
+
     final irregulars = {
       "Loaf": "Loaves",
       "Leaf": "Leaves",
@@ -214,19 +345,16 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
       return irregulars[unit]!;
     }
 
-    // Handle cases like Stick(s), Bag(s), Container(s), Piece(s)
     if (unit.contains("(s)")) {
       final base = unit.replaceAll("(s)", "");
       return quantity > 1 ? "${base}s" : base;
     }
 
-    // Handle cases like Box(es)
     if (unit.contains("(es)")) {
       final base = unit.replaceAll("(es)", "");
       return quantity > 1 ? "${base}es" : base;
     }
 
-    // Default: return unchanged for quantity = 1, add 's' for quantity > 1
     return quantity > 1 ? "${unit}s" : unit;
   }
 
@@ -234,8 +362,6 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     final itemName = _nameController.text.trim();
     final quantityText = _quantityController.text.trim();
     final quantity = int.tryParse(quantityText) ?? 1;
-
-    // Get the base unit (without pluralization)
     String unitText =
         _selectedUnit == "Other"
             ? _unitController.text.trim()
@@ -249,14 +375,12 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
             'name': itemName,
             'quantity': quantity,
             'unit': unitText,
+            'is_purchased': false,
           }).select();
 
       final data = response as List<dynamic>;
 
-      if (data.isEmpty) {
-        print('❌ Insert returned no data.');
-        return;
-      }
+      if (data.isEmpty) return;
 
       setState(() {
         _items.insert(0, data.first as Map<String, dynamic>);
@@ -270,32 +394,26 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     }
   }
 
-  Future<void> _removeItem(int index) async {
-    final item = _items[index];
-    final itemId = item['id'];
-
+  Future<void> _removeItem(int index, bool isPurchased) async {
+    final item = isPurchased ? _purchasedItems[index] : _items[index];
     await Supabase.instance.client
         .from('shopping_list')
         .delete()
-        .eq('id', itemId);
+        .eq('id', item['id']);
 
     setState(() {
-      _items.removeAt(index);
+      isPurchased ? _purchasedItems.removeAt(index) : _items.removeAt(index);
     });
   }
 
-  // Edit Items
-  Future<void> _editItem(int index) async {
-    final item = _items[index];
-
-    // Pre-fill controllers
+  Future<void> _editItem(int index, bool isPurchased) async {
+    final item = isPurchased ? _purchasedItems[index] : _items[index];
     _nameController.text = item['name'];
     _quantityController.text = item['quantity'].toString();
     _selectedUnit =
         _unitOptions.contains(item['unit']) ? item['unit'] : "Other";
     _unitController.text = _selectedUnit == "Other" ? item['unit'] ?? "" : "";
 
-    // Show dialog to update
     await showDialog(
       context: context,
       builder: (context) {
@@ -321,9 +439,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                     _unitOptions
                         .map((u) => DropdownMenuItem(value: u, child: Text(u)))
                         .toList(),
-                onChanged: (val) {
-                  setState(() => _selectedUnit = val);
-                },
+                onChanged: (val) => setState(() => _selectedUnit = val),
                 decoration: const InputDecoration(labelText: 'Unit'),
               ),
               if (_selectedUnit == "Other")
@@ -340,7 +456,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                 _quantityController.text = '1';
                 _unitController.clear();
                 _selectedUnit = null;
-                Navigator.of(context).pop();
+                Navigator.pop(context);
               },
               child: const Text('Cancel'),
             ),
@@ -367,9 +483,15 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                       .eq('id', item['id']);
 
                   setState(() {
-                    _items[index]['name'] = newName;
-                    _items[index]['quantity'] = newQty;
-                    _items[index]['unit'] = newUnit;
+                    if (isPurchased) {
+                      _purchasedItems[index]['name'] = newName;
+                      _purchasedItems[index]['quantity'] = newQty;
+                      _purchasedItems[index]['unit'] = newUnit;
+                    } else {
+                      _items[index]['name'] = newName;
+                      _items[index]['quantity'] = newQty;
+                      _items[index]['unit'] = newUnit;
+                    }
                   });
                 } catch (e) {
                   print('❌ Update error: $e');
@@ -379,7 +501,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                 _quantityController.text = '1';
                 _unitController.clear();
                 _selectedUnit = null;
-                Navigator.of(context).pop();
+                Navigator.pop(context);
               },
               child: const Text('Save'),
             ),
@@ -389,182 +511,184 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
-          'Shopping List',
-          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child:
-                _items.isEmpty
-                    ? _buildEmptyState()
-                    : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _items.length,
-                      itemBuilder: (context, index) {
-                        final item = _items[index];
-                        final quantity = item['quantity'] ?? 1;
-                        final unit = item['unit'] ?? "";
-                        final formattedUnit = formatUnit(unit, quantity);
+  Widget _buildItemCard(
+    Map<String, dynamic> item,
+    int index,
+    bool isPurchased,
+  ) {
+    final quantity = item['quantity'] ?? 1;
+    final unit = item['unit'] ?? "";
+    final formattedUnit = formatUnit(unit, quantity);
 
-                        return Dismissible(
-                          key: Key(item['id'].toString()),
-                          direction: DismissDirection.endToStart,
-                          background: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 20),
-                            color: Colors.green,
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
+    return Dismissible(
+      key: Key(item['id'].toString()),
+      direction:
+          isPurchased
+              ? DismissDirection.startToEnd
+              : DismissDirection.endToStart,
+      background: Container(
+        alignment: isPurchased ? Alignment.centerLeft : Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        color: isPurchased ? Colors.blue : Colors.green,
+        child: Row(
+          mainAxisAlignment:
+              isPurchased ? MainAxisAlignment.start : MainAxisAlignment.end,
+          children: [
+            Icon(
+              isPurchased ? Icons.shopping_cart : Icons.check,
+              color: Colors.white,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              isPurchased ? 'Mark Active' : 'Mark Purchased',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 16),
+          ],
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        if (isPurchased) {
+          await _markAsActive(index);
+        } else {
+          await _markAsPurchased(index);
+        }
+        return true;
+      },
+      onDismissed: (direction) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${item['name']} moved to ${isPurchased ? 'Active' : 'Purchased'}',
+            ),
+            backgroundColor: isPurchased ? Colors.blue : Colors.green,
+          ),
+        );
+      },
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        elevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _editItem(index, isPurchased),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            child: Row(
+              children: [
+                Icon(
+                  isPurchased
+                      ? Icons.check_circle
+                      : Icons.shopping_bag_outlined,
+                  color: isPurchased ? Colors.green : Colors.grey,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item['name'],
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          decoration:
+                              isPurchased ? TextDecoration.lineThrough : null,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Quantity: $quantity ${formattedUnit.isNotEmpty ? formattedUnit : ''}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                          decoration:
+                              isPurchased ? TextDecoration.lineThrough : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.grey),
+                  itemBuilder:
+                      (context) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit, size: 20, color: Colors.grey),
+                              SizedBox(width: 8),
+                              Text('Edit'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, size: 20, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text(
+                                'Delete',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (!isPurchased)
+                          const PopupMenuItem(
+                            value: 'pantry',
+                            child: Row(
                               children: [
                                 Icon(
                                   Icons.kitchen,
-                                  color: Colors.white,
-                                  size: 24,
+                                  size: 20,
+                                  color: Colors.green,
                                 ),
                                 SizedBox(width: 8),
-                                Text(
-                                  'Add to Pantry',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                SizedBox(width: 16),
+                                Text('Add to Pantry'),
                               ],
                             ),
                           ),
-                          confirmDismiss: (direction) async {
-                            await _addToPantry(item);
-                            return false; // We'll handle dismissal in the _addToPantry method
-                          },
-                          child: Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            elevation: 1,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap: () => _editItem(index),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                  horizontal: 16,
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.shopping_bag_outlined,
-                                      color: Colors.green,
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            item['name'],
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Quantity: $quantity ${formattedUnit.isNotEmpty ? formattedUnit : ''}',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.grey[600],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    PopupMenuButton<String>(
-                                      icon: const Icon(
-                                        Icons.more_vert,
-                                        color: Colors.grey,
-                                      ),
-                                      itemBuilder:
-                                          (context) => [
-                                            const PopupMenuItem(
-                                              value: 'edit',
-                                              child: Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.edit,
-                                                    size: 20,
-                                                    color: Colors.grey,
-                                                  ),
-                                                  SizedBox(width: 8),
-                                                  Text('Edit'),
-                                                ],
-                                              ),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: 'delete',
-                                              child: Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.delete,
-                                                    size: 20,
-                                                    color: Colors.red,
-                                                  ),
-                                                  SizedBox(width: 8),
-                                                  Text(
-                                                    'Delete',
-                                                    style: TextStyle(
-                                                      color: Colors.red,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                      onSelected: (value) {
-                                        if (value == 'edit') {
-                                          _editItem(index);
-                                        } else if (value == 'delete') {
-                                          _removeItem(index);
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                      ],
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _editItem(index, isPurchased);
+                    } else if (value == 'delete') {
+                      _removeItem(index, isPurchased);
+                    } else if (value == 'pantry') {
+                      _addToPantry(item);
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
-          _buildInputForm(),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildEmptyState() => Center(
+  Widget _buildEmptyState(bool isPurchased) => Center(
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey[400]),
+        Icon(
+          isPurchased
+              ? Icons.check_circle_outline
+              : Icons.shopping_cart_outlined,
+          size: 80,
+          color: Colors.grey[400],
+        ),
         const SizedBox(height: 24),
         Text(
-          'Your shopping list is empty',
+          isPurchased ? 'No purchased items' : 'Your shopping list is empty',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w500,
@@ -573,7 +697,9 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Add items to your shopping list using the form\nbelow',
+          isPurchased
+              ? 'Items you mark as purchased will appear here'
+              : 'Add items to your shopping list using the form below',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 14, color: Colors.grey[500]),
         ),
@@ -628,9 +754,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
               _unitOptions
                   .map((u) => DropdownMenuItem(value: u, child: Text(u)))
                   .toList(),
-          onChanged: (val) {
-            setState(() => _selectedUnit = val);
-          },
+          onChanged: (val) => setState(() => _selectedUnit = val),
           decoration: const InputDecoration(labelText: 'Unit'),
         ),
         if (_selectedUnit == "Other")
@@ -670,10 +794,64 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
   );
 
   @override
-  void dispose() {
-    _nameController.dispose();
-    _quantityController.dispose();
-    _unitController.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: Colors.grey[50],
+        appBar: AppBar(
+          title: const Text(
+            'Shopping List',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          bottom: TabBar(
+            controller: _tabController,
+            tabs: const [Tab(text: 'Active'), Tab(text: 'Purchased')],
+            indicatorColor: Colors.green,
+            labelColor: Colors.black87,
+            unselectedLabelColor: Colors.grey,
+          ),
+        ),
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            // Active Items Tab
+            Column(
+              children: [
+                Expanded(
+                  child:
+                      _items.isEmpty
+                          ? _buildEmptyState(false)
+                          : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _items.length,
+                            itemBuilder:
+                                (context, index) =>
+                                    _buildItemCard(_items[index], index, false),
+                          ),
+                ),
+                _buildInputForm(),
+              ],
+            ),
+            // Purchased Items Tab
+            _purchasedItems.isEmpty
+                ? _buildEmptyState(true)
+                : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _purchasedItems.length,
+                  itemBuilder:
+                      (context, index) =>
+                          _buildItemCard(_purchasedItems[index], index, true),
+                ),
+          ],
+        ),
+      ),
+    );
   }
 }

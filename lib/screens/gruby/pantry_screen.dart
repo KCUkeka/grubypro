@@ -124,6 +124,8 @@ class _PantryScreenState extends State<PantryScreen> {
                   DropdownMenuItem(value: 'Stick(s)', child: Text('Stick(s)')),
                   DropdownMenuItem(value: 'Bag(s)', child: Text('Bag(s)')),
                   DropdownMenuItem(value: 'Box(es)', child: Text('Box(es)')),
+                  DropdownMenuItem(value: 'Bottle(s)', child: Text('Bottle(s)')),
+                  DropdownMenuItem(value: 'Gallon', child: Text('Gallon')),
                   DropdownMenuItem(
                     value: 'Container(s)', 
                     child: Text('Container(s)'),
