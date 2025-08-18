@@ -299,10 +299,25 @@ Widget build(BuildContext context) {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.settings),
+          icon: const Icon(Icons.settings_outlined),
           onPressed: () {
           },
         ),
+        // Add Recipe button
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF4CAF50).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.add),
+              color: const Color(0xFF4CAF50),
+              onPressed: _showAddRecipeDialog,
+              tooltip: 'Add Pantry Item',
+            ),
+          ),
+
       ],
     ),
     body: SafeArea(

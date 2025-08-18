@@ -148,9 +148,9 @@ class _BillsScreenState extends State<BillsScreen> {
           child: const Text('Cancel'),
         ),
         TextButton(
-          onPressed: () {
-            _deleteBill(bill);
-            Navigator.pop(context);
+          onPressed: () async{
+           await _deleteBill(bill);
+           if (mounted) Navigator.pop(context);
           },
           child: const Text(
             'Delete',
@@ -433,7 +433,7 @@ Widget _buildBillItem(Bill bill) {
         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20)),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.settings),
+          icon: const Icon(Icons.settings_outlined),
           onPressed: () {
             Navigator.push(
               context,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:grubypro/screens/ecb/ecb_home.dart';
 import 'package:grubypro/screens/gruby/grubyhome.dart';
 import 'paypro/paypro_home.dart'; 
 
@@ -50,6 +51,19 @@ class LandingPage extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const PayproHomeScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+            _AppCard(
+              title: 'ECB',
+              description: 'Ethalle Cake & Bakes',
+              icon: Image.asset('lib/img/ecb_logo.png', width: 40, height: 40),
+              color: const Color.fromARGB(234, 225, 84, 131),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EcbHomeScreen()),
                 );
               },
             ),

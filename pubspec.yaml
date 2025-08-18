@@ -23,6 +23,13 @@ dependencies:
   cupertino_icons: ^1.0.8
   supabase_flutter: ^2.9.1
   flutter_dotenv: ^5.2.1
+  google_sign_in: ^7.1.1
+  googleapis: ^14.0.0
+  googleapis_auth: ^2.0.0
+  image_picker: ^1.2.0
+  http: ^1.5.0
+  url_launcher: ^6.3.2
+  file_picker: ^10.3.1
 
 
 dev_dependencies:
@@ -41,5 +48,6 @@ flutter:
     - .env
     - lib/img/gruby.png
     - lib/img/paypro_blue.png
+    - lib/img/ecb_logo.png
 
   uses-material-design: true
