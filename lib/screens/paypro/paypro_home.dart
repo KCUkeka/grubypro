@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:grubypro/screens/Paypro/bill_screen.dart';
-import 'package:grubypro/screens/Paypro/loans_screen.dart';
-import 'package:grubypro/screens/Paypro/transactions_screen.dart';
+import 'package:grubypro/screens/paypro/bill_screen.dart';
+import 'package:grubypro/screens/paypro/loans_screen.dart';
+import 'package:grubypro/screens/paypro/transactions_screen.dart';
+
 
 class PayproHomeScreen extends StatefulWidget {
   const PayproHomeScreen({super.key});
