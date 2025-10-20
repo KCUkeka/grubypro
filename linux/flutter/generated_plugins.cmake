@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  desktop_updater
   file_selector_linux
   gtk
   url_launcher_linux
