@@ -15,33 +15,35 @@ class _LandingPageState extends State<LandingPage> {
   bool _isCheckingUpdate = false;
 
   Future<void> _checkForUpdates() async {
-    setState(() => _isCheckingUpdate = true);
+  setState(() => _isCheckingUpdate = true);
 
-    try {
-      final result = await DesktopUpdater.update(
-        version: '1.0.0', // current version of your app
-        url:
-            'https://raw.githubusercontent.com/<your-username>/<your-repo>/main/releases/latest.json',
-        appName: 'GrubyPro Suite',
+  try {
+    final updater = DesktopUpdater();
+    final updateInfo = await updater.versionCheck(
+      appArchiveUrl: 'https://raw.githubusercontent.com/KCUkeka/grubypro/blob/Desktop/releases/latest.json',
+    );
+
+    if (updateInfo != null) {
+      // e.g. compare updateInfo.version with current version
+      // if new version → call updateApp
+      final updateStream = await updater.updateApp(
+        remoteUpdateFolder: updateInfo.url, 
+        changedFiles: updateInfo.changes, // depends on how updateInfo is structured
       );
 
-      switch (result) {
-        case UpdateResult.updated:
-          _showSnack('✅ Update downloaded! Please restart the app.');
-          break;
-        case UpdateResult.noUpdateAvailable:
-          _showSnack('Your app is up to date.');
-          break;
-        case UpdateResult.failed:
-          _showSnack('❌ Update failed. Try again later.');
-          break;
-      }
-    } catch (e) {
-      _showSnack('⚠️ Error checking for updates: $e');
-    } finally {
-      setState(() => _isCheckingUpdate = false);
+      // maybe listen to updateStream for progress
+      await updater.restartApp();
+      _showSnack('Update applied. Restarting...');
+    } else {
+      _showSnack('No update available.');
     }
+  } catch (e) {
+    _showSnack('Error checking updates: $e');
+  } finally {
+    setState(() => _isCheckingUpdate = false);
   }
+}
+
 
   void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
