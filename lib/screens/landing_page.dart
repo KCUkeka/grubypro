@@ -1,10 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:grubypro/screens/ecb/ecb_home.dart';
 import 'package:grubypro/screens/gruby/grubyhome.dart';
-import 'paypro/paypro_home.dart'; 
+import 'paypro/paypro_home.dart';
+import 'package:desktop_updater/desktop_updater.dart';
 
-class LandingPage extends StatelessWidget {
+class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
+
+  @override
+  State<LandingPage> createState() => _LandingPageState();
+}
+
+class _LandingPageState extends State<LandingPage> {
+  bool _isCheckingUpdate = false;
+
+  Future<void> _checkForUpdates() async {
+    setState(() => _isCheckingUpdate = true);
+
+    try {
+      final result = await DesktopUpdater.update(
+        version: '1.0.0', // current version of your app
+        url:
+            'https://raw.githubusercontent.com/<your-username>/<your-repo>/main/releases/latest.json',
+        appName: 'GrubyPro Suite',
+      );
+
+      switch (result) {
+        case UpdateResult.updated:
+          _showSnack('✅ Update downloaded! Please restart the app.');
+          break;
+        case UpdateResult.noUpdateAvailable:
+          _showSnack('Your app is up to date.');
+          break;
+        case UpdateResult.failed:
+          _showSnack('❌ Update failed. Try again later.');
+          break;
+      }
+    } catch (e) {
+      _showSnack('⚠️ Error checking for updates: $e');
+    } finally {
+      setState(() => _isCheckingUpdate = false);
+    }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,17 +55,31 @@ class LandingPage extends StatelessWidget {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text(
-          'Choose Your App',
-          style: TextStyle(
-            fontWeight: FontWeight.bold, // Makes text bold
-            fontSize: 20, // Optional: Adjust font size if needed
-          ),
+          'Select Your App',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 1,
         foregroundColor: Colors.black87,
-        toolbarHeight: 80, // Increases AppBar height (brings text down)
+        toolbarHeight: 80,
+        actions: [
+          IconButton(
+            tooltip: 'Check for Updates',
+            icon:
+                _isCheckingUpdate
+                    ? const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                    : const Icon(Icons.system_update),
+            onPressed: _isCheckingUpdate ? null : _checkForUpdates,
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -45,7 +102,11 @@ class LandingPage extends StatelessWidget {
             _AppCard(
               title: 'PayPro',
               description: 'Bill Management & Payments',
-              icon: Image.asset('lib/img/paypro_blue.png', width: 40, height: 40),
+              icon: Image.asset(
+                'lib/img/paypro_blue.png',
+                width: 40,
+                height: 40,
+              ),
               color: Colors.deepOrange,
               onTap: () {
                 Navigator.push(
@@ -104,7 +165,7 @@ class _AppCard extends StatelessWidget {
               color: Colors.black12,
               blurRadius: 10,
               offset: const Offset(0, 4),
-            )
+            ),
           ],
         ),
         child: Row(
@@ -119,12 +180,18 @@ class _AppCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.w600)),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(description,
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                  Text(
+                    description,
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  ),
                 ],
               ),
             ),
