@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:grubypro/screens/ecb/driving.dart';
 import 'package:grubypro/screens/ecb/invoice.dart';
 import 'package:grubypro/screens/ecb/receipts.dart';
+import 'package:grubypro/screens/ecb/sales.dart';
 
 class EcbHomeScreen extends StatefulWidget {
   const EcbHomeScreen({super.key});
@@ -14,6 +15,7 @@ class _EcbHomeScreenState extends State<EcbHomeScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = [
+    const SalesScreen(),
     const ReceiptsScreen(),
     const InvoiceScreen(),
     const DrivingScreen(),
@@ -30,6 +32,10 @@ class _EcbHomeScreenState extends State<EcbHomeScreen> {
         unselectedItemColor: Colors.grey,
         onTap: (index) => setState(() => _currentIndex = index),
         items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.money_off_outlined),
+            label: 'Sales',
+          ),
           BottomNavigationBarItem(
             icon: Icon(Icons.receipt_long),
             label: 'Receipts',
