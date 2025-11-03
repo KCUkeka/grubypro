@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:grubypro/screens/ecb/sale_calculator.dart';
 
+// **********************************SALES PAGE******************************************
 class SalesScreen extends StatefulWidget {
   const SalesScreen({super.key});
 
