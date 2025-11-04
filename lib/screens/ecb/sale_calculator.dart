@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart'; // Add this to pubspec.yaml: intl: ^0.18.0
+import 'package:intl/intl.dart';
+
+// *******************************************SHOPPING CART VIEW*********************************
 
 class SaleCalculator extends StatefulWidget {
   const SaleCalculator({super.key});
