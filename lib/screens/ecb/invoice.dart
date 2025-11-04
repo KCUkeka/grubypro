@@ -1,5 +1,6 @@
 // invoice.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
@@ -29,121 +30,133 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     super.initState();
     _fetchData();
   }
-// Delete invoice method
-Future<void> _deleteInvoice(Map<String, dynamic> invoice) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Delete Invoice'),
-      content: Text(
-        'Are you sure you want to delete invoice #${invoice['id']}?\n\nThis will remove the invoice but keep the sales records.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          style: TextButton.styleFrom(foregroundColor: Colors.red),
-          child: const Text('Delete'),
-        ),
-      ],
-    ),
-  );
 
-  if (confirmed == true) {
-    try {
-      // First, remove invoice_id from all associated sales
-      final saleIds = List<String>.from(invoice['sale_ids']);
-      for (var saleId in saleIds) {
-        await _supabase.from('sales').update({'invoice_id': null}).eq('id', saleId);
-      }
-
-      // Then delete the invoice
-      await _supabase.from('invoices').delete().eq('id', invoice['id']);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invoice deleted successfully'),
-            backgroundColor: Colors.green,
+  // Delete invoice method
+  Future<void> _deleteInvoice(Map<String, dynamic> invoice) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Invoice'),
+            content: Text(
+              'Are you sure you want to delete invoice #${invoice['id']}?\n\nThis will remove the invoice but keep the sales records.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
           ),
-        );
-        _fetchData(); // Refresh the list
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting invoice: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+    );
+
+    if (confirmed == true) {
+      try {
+        // First, remove invoice_id from all associated sales
+        final saleIds = List<String>.from(invoice['sale_ids']);
+        for (var saleId in saleIds) {
+          await _supabase
+              .from('sales')
+              .update({'invoice_id': null})
+              .eq('id', saleId);
+        }
+
+        // Then delete the invoice
+        await _supabase.from('invoices').delete().eq('id', invoice['id']);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invoice deleted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _fetchData(); // Refresh the list
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting invoice: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
-}
 
-// Unsave Invoice method
-
-Future<void> _unsaveInvoice(Map<String, dynamic> invoice) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Unsave Invoice'),
-      content: Text(
-        'Are you sure you want to unsave invoice #${invoice['id']}?\n\nThis will change it to draft status and remove invoice associations from sales.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          style: TextButton.styleFrom(foregroundColor: Colors.orange),
-          child: const Text('Unsave'),
-        ),
-      ],
-    ),
-  );
-
-  if (confirmed == true) {
-    try {
-      // Remove invoice_id from all associated sales
-      final saleIds = List<String>.from(invoice['sale_ids']);
-      for (var saleId in saleIds) {
-        await _supabase.from('sales').update({'invoice_id': null}).eq('id', saleId);
-      }
-
-      // Update invoice status to draft
-      await _supabase.from('invoices').update({
-        'status': 'draft',
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', invoice['id']);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invoice unsaved successfully'),
-            backgroundColor: Colors.green,
+  // Unsave Invoice method
+  Future<void> _unsaveInvoice(Map<String, dynamic> invoice) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Unsave Invoice'),
+            content: Text(
+              'Are you sure you want to unsave invoice #${invoice['id']}?\n\nThis will change it to draft status and remove invoice associations from sales.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.orange),
+                child: const Text('Unsave'),
+              ),
+            ],
           ),
-        );
-        _fetchData(); // Refresh the list
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error unsaving invoice: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+    );
+
+    if (confirmed == true) {
+      try {
+        // Remove invoice_id from all associated sales
+        final saleIds = List<String>.from(invoice['sale_ids']);
+        for (var saleId in saleIds) {
+          await _supabase
+              .from('sales')
+              .update({'invoice_id': null})
+              .eq('id', saleId);
+        }
+
+        // Update invoice status to draft
+        await _supabase
+            .from('invoices')
+            .update({
+              'status': 'draft',
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', invoice['id']);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invoice unsaved successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _fetchData(); // Refresh the list
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error unsaving invoice: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
-}
+
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
 
@@ -534,7 +547,7 @@ Future<void> _unsaveInvoice(Map<String, dynamic> invoice) async {
                                               color: Colors.red,
                                               size: 20,
                                             ),
-                                            SizedBox(width: 8),
+                                            const SizedBox(width: 8),
                                             Text(
                                               'Delete Invoice',
                                               style: TextStyle(
@@ -568,26 +581,28 @@ Future<void> _unsaveInvoice(Map<String, dynamic> invoice) async {
   }
 
   void _editInvoice(Map<String, dynamic> invoice) async {
-  // Fetch the sales included in this invoice
-  final saleIds = List<String>.from(invoice['sale_ids']);
-  final includedSales = _sales.where((sale) => saleIds.contains(sale['id'])).toList();
-  
-  final result = await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => CreateInvoiceScreen(
-        selectedSaleIds: saleIds,
-        sales: _sales,
-        existingInvoice: invoice,
-        includedSales: includedSales,
+    // Fetch the sales included in this invoice
+    final saleIds = List<String>.from(invoice['sale_ids']);
+    final includedSales =
+        _sales.where((sale) => saleIds.contains(sale['id'])).toList();
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => CreateInvoiceScreen(
+              selectedSaleIds: saleIds,
+              sales: _sales,
+              existingInvoice: invoice,
+              includedSales: includedSales,
+            ),
       ),
-    ),
-  );
-  
-  if (result == true) {
-    _fetchData(); // Refresh data after editing
+    );
+
+    if (result == true) {
+      _fetchData(); // Refresh data after editing
+    }
   }
-}
 }
 
 // ************************************* CREATE INVOICE SCREEN *************************************
@@ -607,20 +622,43 @@ class CreateInvoiceScreen extends StatefulWidget {
   });
 
   @override
-  
-  State<CreateInvoiceScreen> createState() => 
-  
-  _CreateInvoiceScreenState();
-  
+  State<CreateInvoiceScreen> createState() => _CreateInvoiceScreenState();
 }
 
 class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
   final _supabase = Supabase.instance.client;
   final _customerNameController = TextEditingController();
   final _customerEmailController = TextEditingController();
+  final _customerPhoneController = TextEditingController();
   final _notesController = TextEditingController();
   bool _isGenerating = false;
   bool _isSaving = false;
+
+  // Validation methods
+  String? _validateEmail(String? value) {
+    if (value == null || value.isEmpty) return null; // Optional field
+    final emailRegex = RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    );
+    if (!emailRegex.hasMatch(value)) {
+      return 'Please enter a valid email address';
+    }
+    return null;
+  }
+
+  // Phone validation
+  String? _validatePhone(String? value) {
+  if (value == null || value.isEmpty) return null; // Optional field
+  
+  // Remove all non-digits and check length
+  final digitsOnly = value.replaceAll(RegExp(r'[^\d]'), '');
+  
+  if (digitsOnly.length < 10) {
+    return 'Please enter at least 10 digits';
+  }
+  
+  return null;
+}
 
   @override
   void initState() {
@@ -631,7 +669,11 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
           widget.existingInvoice!['customer_name'] ?? '';
       _customerEmailController.text =
           widget.existingInvoice!['customer_email'] ?? '';
-      _notesController.text = widget.existingInvoice!['notes'] ?? '';
+
+      // Format existing phone number for display
+      _customerPhoneController.text = widget.existingInvoice!['customer_phone'] ?? '';
+    
+    _notesController.text = widget.existingInvoice!['notes'] ?? '';
     }
   }
 
@@ -678,12 +720,41 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
   }
 
   Future<void> _saveInvoice() async {
+    // Validate email and phone if provided
+    final emailError = _validateEmail(_customerEmailController.text);
+    final phoneError = _validatePhone(_customerPhoneController.text);
+
+    if (emailError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(emailError), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // Validate phone only when form is submitted (not during typing)
+    final phoneDigits = _customerPhoneController.text.replaceAll(
+      RegExp(r'[^\d]'),
+      '',
+    );
+    if (_customerPhoneController.text.isNotEmpty && phoneDigits.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please enter a valid 10-digit phone number'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
       final invoiceId =
           widget.existingInvoice?['id'] ??
           'INV-${DateTime.now().millisecondsSinceEpoch}';
+
+      // Store phone number without formatting in database
+      final rawPhone = _customerPhoneController.text.replaceAll(RegExp(r'[^\d]'), '');
 
       final invoice = {
         'id': invoiceId,
@@ -702,6 +773,8 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
             _customerEmailController.text.isEmpty
                 ? null
                 : _customerEmailController.text,
+        'customer_phone':
+            rawPhone.isEmpty ? null : rawPhone, // Store unformatted
         'notes': _notesController.text.isEmpty ? null : _notesController.text,
         'status': 'saved',
         'updated_at': DateTime.now().toIso8601String(),
@@ -755,12 +828,33 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
   }
 
   Future<void> _generateInvoice() async {
+    // Validate email and phone if provided
+    final emailError = _validateEmail(_customerEmailController.text);
+    final phoneError = _validatePhone(_customerPhoneController.text);
+
+    if (emailError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(emailError), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    if (phoneError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(phoneError), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     setState(() => _isGenerating = true);
 
     try {
       final invoiceId =
           widget.existingInvoice?['id'] ??
           'INV-${DateTime.now().millisecondsSinceEpoch}';
+
+      // Store phone number without formatting in database
+      final rawPhone = _customerPhoneController.text.replaceAll(RegExp(r'[^\d]'), '');
 
       final invoice = {
         'id': invoiceId,
@@ -779,6 +873,8 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
             _customerEmailController.text.isEmpty
                 ? null
                 : _customerEmailController.text,
+        'customer_phone':
+            rawPhone.isEmpty ? null : rawPhone, // Store unformatted
         'notes': _notesController.text.isEmpty ? null : _notesController.text,
         'status': 'draft',
       };
@@ -872,6 +968,21 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
                                 border: OutlineInputBorder(),
                               ),
                               keyboardType: TextInputType.emailAddress,
+                              validator: _validateEmail,
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _customerPhoneController,
+                              decoration: const InputDecoration(
+                                labelText: 'Customer Phone (Optional)',
+                                border: OutlineInputBorder(),
+                                hintText: '1234567890 or 123-456-7890',
+                              ),
+                              keyboardType: TextInputType.phone,
+                              inputFormatters: [
+                                // Optional: Allow longer input for international numbers
+                                LengthLimitingTextInputFormatter(10),
+                              ],
                             ),
                           ],
                         ),
@@ -1159,7 +1270,8 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
             style: TextStyle(
               fontSize: isTotal ? 18 : 14,
               fontWeight: FontWeight.bold,
-              color: isTotal ? const Color(0xFFD437) : Colors.black,
+              // FIXED: Corrected color code
+              color: isTotal ? const Color(0xFFD4AF37) : Colors.black,
             ),
           ),
         ],
@@ -1171,6 +1283,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
   void dispose() {
     _customerNameController.dispose();
     _customerEmailController.dispose();
+    _customerPhoneController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -1199,6 +1312,24 @@ class InvoicePreviewScreen extends StatefulWidget {
 class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
   final _supabase = Supabase.instance.client;
   bool _isSaving = false;
+
+  String _formatPhoneForDisplay(String? phone) {
+  if (phone == null || phone.isEmpty) return '';
+  
+  // Remove all non-digits
+  final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
+  
+  if (digits.length == 10) {
+    // Format as (xxx) xxx-xxxx
+    return '(${digits.substring(0, 3)}) ${digits.substring(3, 6)}-${digits.substring(6, 10)}';
+  } else if (digits.length == 11 && digits.startsWith('1')) {
+    // Format US numbers with country code: 1 (xxx) xxx-xxxx
+    return '+1 (${digits.substring(1, 4)}) ${digits.substring(4, 7)}-${digits.substring(7, 11)}';
+  } else {
+    // Return as-is for other formats
+    return phone;
+  }
+}
 
   Future<Uint8List> _generatePdf() async {
     final pdf = pw.Document();
@@ -1253,7 +1384,8 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
 
               // Customer Information
               if (widget.invoiceData['customer_name'] != null ||
-                  widget.invoiceData['customer_email'] != null)
+                  widget.invoiceData['customer_email'] != null ||
+                  widget.invoiceData['customer_phone'] != null)
                 pw.Container(
                   padding: const pw.EdgeInsets.all(10),
                   decoration: pw.BoxDecoration(
@@ -1270,6 +1402,12 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
                         pw.Text(widget.invoiceData['customer_name']),
                       if (widget.invoiceData['customer_email'] != null)
                         pw.Text(widget.invoiceData['customer_email']),
+                      if (widget.invoiceData['customer_phone'] != null)
+                        pw.Text(
+                          _formatPhoneForDisplay(
+                            widget.invoiceData['customer_phone'],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -1284,7 +1422,6 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
-
               pw.SizedBox(height: 10),
 
               pw.Table(
@@ -1528,12 +1665,7 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
               Printing.layoutPdf(onLayout: (format) => _generatePdf());
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () {
-              _shareInvoice();
-            },
-          ),
+          IconButton(icon: const Icon(Icons.share), onPressed: _shareInvoice),
         ],
       ),
       body: SingleChildScrollView(
@@ -1604,7 +1736,8 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
 
             // Customer Information
             if (widget.invoiceData['customer_name'] != null ||
-                widget.invoiceData['customer_email'] != null)
+                widget.invoiceData['customer_email'] != null ||
+                widget.invoiceData['customer_phone'] != null)
               Container(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -1621,6 +1754,12 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
                       Text(widget.invoiceData['customer_name']),
                     if (widget.invoiceData['customer_email'] != null)
                       Text(widget.invoiceData['customer_email']),
+                    if (widget.invoiceData['customer_phone'] != null)
+                      Text(
+                        _formatPhoneForDisplay(
+                          widget.invoiceData['customer_phone'],
+                        ),
+                      ),
                   ],
                 ),
               ),
