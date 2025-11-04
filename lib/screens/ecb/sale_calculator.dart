@@ -128,7 +128,6 @@ class _SaleCalculator extends State<SaleCalculator> {
                         controller: _priceController,
                         decoration: InputDecoration(
                           labelText: 'Price',
-                          prefixText: '\$',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -478,13 +477,13 @@ class _SaleCalculator extends State<SaleCalculator> {
         _priceController.clear();
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$name added to cart'),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(
+      //     content: Text('$name added to cart'),
+      //     duration: const Duration(seconds: 1),
+      //     behavior: SnackBarBehavior.floating,
+      //   ),
+      // );
     }
   }
 
