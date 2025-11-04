@@ -366,41 +366,82 @@ Widget _buildSummaryCards() {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _filteredSales.length,
-      itemBuilder: (context, index) {
-        final sale = _filteredSales[index];
-        final items = List<Map<String, dynamic>>.from(sale['sale_items'] ?? []);
-        final itemCount = items.fold<int>(0, (sum, item) => sum + (item['quantity'] as int));
-        final date = DateTime.parse(sale['sale_date']);
+    padding: const EdgeInsets.all(16),
+    itemCount: _filteredSales.length,
+    itemBuilder: (context, index) {
+      final sale = _filteredSales[index];
+      final items = List<Map<String, dynamic>>.from(sale['sale_items'] ?? []);
+      final itemCount = items.fold<int>(0, (sum, item) => sum + (item['quantity'] as int));
+      final date = DateTime.parse(sale['sale_date']);
+      final isInvoiced = sale['invoice_id'] != null;
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: const Color(0xFFD4AF37),
-              child: const Icon(Icons.shopping_bag, color: Colors.white),
-            ),
-            title: Text(
-              'Sale #${sale['id'].toString().substring(0, 8)}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              '${DateFormat('MMM dd, yyyy').format(date)} • $itemCount item${itemCount != 1 ? 's' : ''}',
-            ),
-            trailing: Text(
-              '\$${(sale['total'] as num).toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Color(0xFFD4AF37),
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: ListTile(
+          leading: Stack(
+            children: [
+              CircleAvatar(
+                backgroundColor: isInvoiced ? Colors.green : const Color(0xFFD4AF37),
+                child: Icon(
+                  Icons.shopping_bag,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            onTap: () => _showSaleDetails(sale),
+              if (isInvoiced)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check,
+                      color: Colors.green,
+                      size: 12,
+                    ),
+                  ),
+                ),
+            ],
           ),
-        );
-      },
-    );
+          title: Row(
+            children: [
+              Text(
+                'Sale #${sale['id'].toString().substring(0, 8)}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              if (isInvoiced)
+                const Padding(
+                  padding: EdgeInsets.only(left: 8.0),
+                  child: Icon(
+                    Icons.verified,
+                    color: Colors.green,
+                    size: 16,
+                  ),
+                ),
+            ],
+          ),
+          subtitle: Text(
+            '${DateFormat('MMM dd, yyyy').format(date)} • $itemCount item${itemCount != 1 ? 's' : ''}${isInvoiced ? ' • Invoiced' : ''}',
+            style: TextStyle(
+              color: isInvoiced ? Colors.green : null,
+            ),
+          ),
+          trailing: Text(
+            '\$${(sale['total'] as num).toStringAsFixed(2)}',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: isInvoiced ? Colors.green : const Color(0xFFD4AF37),
+            ),
+          ),
+          onTap: () => _showSaleDetails(sale),
+        ),
+      );
+    },
+  );
   }
 
   void _showSaleDetails(Map<String, dynamic> sale) {
