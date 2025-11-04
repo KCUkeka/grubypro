@@ -3,6 +3,7 @@ import 'package:grubypro/screens/ecb/sale_calculator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 
+// *******************************SALE PAGE************************************
 class SalesScreen extends StatefulWidget {
   const SalesScreen({super.key});
 
@@ -55,6 +56,7 @@ class _SalesScreenState extends State<SalesScreen> {
     }
   }
 
+// Filter for totals at the top
   void _calculateTotals() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -262,26 +264,52 @@ class _SalesScreenState extends State<SalesScreen> {
     );
   }
 
-  Widget _buildSummaryCards() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: _summaryCard('Today', '\$${_todayTotal.toStringAsFixed(2)}', Colors.green),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _summaryCard('This Week', '\$${_weekTotal.toStringAsFixed(2)}', Colors.blue),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _summaryCard('This Month', '\$${_monthTotal.toStringAsFixed(2)}', Colors.purple),
-          ),
-        ],
+Widget _buildSummaryCards() {
+  // Calculate the total for currently filtered sales
+  double filteredTotal = _filteredSales.fold<double>(
+    0, 
+    (sum, sale) => sum + (sale['total'] as num).toDouble()
+  );
+
+  return Padding(
+    padding: const EdgeInsets.all(16.0),
+    child: Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${_selectedFilter} Total',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '\$${filteredTotal.toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFD4AF37),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${_filteredSales.length} sale${_filteredSales.length != 1 ? 's' : ''}',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _summaryCard(String label, String amount, Color color) {
     return Card(

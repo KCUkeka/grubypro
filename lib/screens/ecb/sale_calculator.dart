@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+// *************************************CART PAGE********************************
+
 class SaleCalculator extends StatefulWidget {
   final Map<String, dynamic>? existingSale;
 
@@ -24,6 +26,15 @@ class _SaleCalculator extends State<SaleCalculator> {
   bool _isSaving = false;
   final _supabase = Supabase.instance.client;
 
+  // New variables for product management
+  List<String> _availableProducts = [];
+  String? _selectedProduct;
+  bool _isCustomProduct = false;
+  bool _isLoadingProducts = true;
+  
+  // New variable for macaron size selection
+  String? _selectedMacaronSize;
+
   double get _subtotal {
     return _cartItems.fold(
       0,
@@ -38,10 +49,39 @@ class _SaleCalculator extends State<SaleCalculator> {
   @override
   void initState() {
     super.initState();
-
+    _loadProducts();
+    
     // Load existing sale data if editing
     if (widget.existingSale != null) {
       _loadExistingSale();
+    }
+  }
+
+  Future<void> _loadProducts() async {
+    try {
+      setState(() => _isLoadingProducts = true);
+      
+      // Fetch distinct product names from existing sales
+      final response = await _supabase
+          .from('sale_items')
+          .select('product_name')
+          .order('product_name');
+      
+      if (response.isNotEmpty) {
+        final products = response
+            .map<String>((item) => item['product_name'] as String)
+            .toSet() // Remove duplicates
+            .toList()
+          ..sort();
+        
+        setState(() {
+          _availableProducts = products;
+        });
+      }
+    } catch (e) {
+      print('Error loading products: $e');
+    } finally {
+      setState(() => _isLoadingProducts = false);
     }
   }
 
@@ -152,23 +192,13 @@ class _SaleCalculator extends State<SaleCalculator> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      TextFormField(
-                        controller: _nameController,
-                        decoration: InputDecoration(
-                          labelText: 'Product Name',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          prefixIcon: const Icon(Icons.shopping_bag),
-                        ),
-                        validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
-                      ),
+                      // Product Selection Dropdown with Free Text Option
+                      _buildProductInputField(),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _priceController,
                         decoration: InputDecoration(
                           labelText: 'Price',
-                          prefixText: '\$',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -193,6 +223,9 @@ class _SaleCalculator extends State<SaleCalculator> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      if (_availableProducts.isNotEmpty)
+                        _buildRecentProducts(),
                     ],
                   ),
                 ),
@@ -204,6 +237,346 @@ class _SaleCalculator extends State<SaleCalculator> {
       ),
     );
   }
+
+  Widget _buildProductInputField() {
+  // Define the main product options
+  final mainProducts = ['Cake Pop', 'Macaron', 'Cake Jar'];
+  
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Dropdown with custom option
+      DropdownButtonFormField<String>(
+        value: _isCustomProduct ? null : _selectedProduct,
+        decoration: InputDecoration(
+          labelText: 'Product Name',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          prefixIcon: const Icon(Icons.shopping_bag),
+        ),
+        items: [
+          // Main product options
+          ...mainProducts.map((product) {
+            return DropdownMenuItem(
+              value: product,
+              child: Text(product),
+            );
+          }).toList(),
+          
+          // Separator
+          const DropdownMenuItem(
+            value: '__divider__',
+            enabled: false,
+            child: Divider(),
+          ),
+          
+          // Custom product option
+          const DropdownMenuItem(
+            value: '__custom__',
+            child: Row(
+              children: [
+                Icon(Icons.create, size: 18),
+                SizedBox(width: 8),
+                Text('Add custom product...'),
+              ],
+            ),
+          ),
+          
+          // Another separator
+          const DropdownMenuItem(
+            value: '__divider2__',
+            enabled: false,
+            child: Divider(),
+          ),
+          
+          // Available products from database (excluding main products)
+          ..._availableProducts.where((product) => !mainProducts.contains(product)).map((product) {
+            return DropdownMenuItem(
+              value: product,
+              child: Text(product),
+            );
+          }).toList(),
+        ],
+        onChanged: (String? value) {
+          if (value == '__custom__') {
+            setState(() {
+              _isCustomProduct = true;
+              _selectedProduct = null;
+              _selectedVariant = null;
+              _nameController.clear();
+              _priceController.clear();
+            });
+          } else if (value != null && value != '__divider__' && value != '__divider2__') {
+            setState(() {
+              _isCustomProduct = false;
+              _selectedProduct = value;
+              _nameController.text = value;
+              _selectedVariant = null; // Reset variant when product changes
+              
+              // Auto-fill price based on product type
+              _autoFillPrice(value);
+            });
+          }
+        },
+        validator: (value) {
+          if (!_isCustomProduct && (value == null || value.isEmpty)) {
+            return 'Please select a product';
+          }
+          if (_isCustomProduct && _nameController.text.isEmpty) {
+            return 'Please enter a product name';
+          }
+          return null;
+        },
+      ),
+      
+      // Custom product text field (shown when custom is selected)
+      if (_isCustomProduct) ...[
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _nameController,
+          decoration: InputDecoration(
+            labelText: 'Custom Product Name',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            prefixIcon: const Icon(Icons.create),
+          ),
+          onChanged: (value) {
+            // Auto-fill price for custom products that match known types
+            if (value.isNotEmpty) {
+              _autoFillPrice(value);
+            }
+          },
+          validator: (v) => _isCustomProduct && (v?.isEmpty ?? true) 
+              ? 'Required' 
+              : null,
+        ),
+      ],
+      
+      // Macaron Variant Selection
+      if (_selectedProduct == 'Macaron') ...[
+        const SizedBox(height: 12),
+        Text(
+          'Macaron Size:',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ChoiceChip(
+              label: const Text('Medium (\$3.50)'),
+              selected: _selectedVariant == 'Medium',
+              onSelected: (selected) {
+                setState(() {
+                  _selectedVariant = 'Medium';
+                  _priceController.text = '3.50';
+                });
+              },
+              selectedColor: const Color(0xFFD4AF37).withOpacity(0.3),
+              checkmarkColor: const Color(0xFFD4AF37),
+            ),
+            ChoiceChip(
+              label: const Text('Large (\$4.00)'),
+              selected: _selectedVariant == 'Large',
+              onSelected: (selected) {
+                setState(() {
+                  _selectedVariant = 'Large';
+                  _priceController.text = '4.00';
+                });
+              },
+              selectedColor: const Color(0xFFD4AF37).withOpacity(0.3),
+              checkmarkColor: const Color(0xFFD4AF37),
+            ),
+            ChoiceChip(
+              label: const Text('Bundle (\$10.00)'),
+              selected: _selectedVariant == 'Bundle',
+              onSelected: (selected) {
+                setState(() {
+                  _selectedVariant = 'Bundle';
+                  _priceController.text = '10.00';
+                });
+              },
+              selectedColor: const Color(0xFFD4AF37).withOpacity(0.3),
+              checkmarkColor: const Color(0xFFD4AF37),
+            ),
+          ],
+        ),
+      ],
+      
+      // Cake Jar Variant Selection
+      if (_selectedProduct == 'Cake Jar') ...[
+        const SizedBox(height: 12),
+        Text(
+          'Cake Jar Option:',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ChoiceChip(
+              label: const Text('Regular (\$9.50)'),
+              selected: _selectedVariant == 'Regular',
+              onSelected: (selected) {
+                setState(() {
+                  _selectedVariant = 'Regular';
+                  _priceController.text = '9.50';
+                });
+              },
+              selectedColor: const Color(0xFFD4AF37).withOpacity(0.3),
+              checkmarkColor: const Color(0xFFD4AF37),
+            ),
+            ChoiceChip(
+              label: const Text('Bundle (\$18.00)'),
+              selected: _selectedVariant == 'Bundle',
+              onSelected: (selected) {
+                setState(() {
+                  _selectedVariant = 'Bundle';
+                  _priceController.text = '18.00';
+                });
+              },
+              selectedColor: const Color(0xFFD4AF37).withOpacity(0.3),
+              checkmarkColor: const Color(0xFFD4AF37),
+            ),
+          ],
+        ),
+      ],
+      
+      // Cake Pop Auto-price (no variant selection needed)
+      if (_selectedProduct == 'Cake Pop') ...[
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.green.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.green.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.attach_money, color: Colors.green[700], size: 16),
+              const SizedBox(width: 8),
+              Text(
+                'Price automatically set to \$4.00',
+                style: TextStyle(
+                  color: Colors.green[700],
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ],
+  );
+}
+  // Add this variable to your state class
+String? _selectedVariant;
+
+void _autoFillPrice(String productName) {
+  setState(() {
+    switch (productName) {
+      case 'Cake Pop':
+        _priceController.text = '4.00';
+        _selectedVariant = null; // No variant for cake pops
+        break;
+      case 'Macaron':
+        // Don't auto-fill price until variant is selected
+        // Set default to Medium if no variant selected
+        if (_selectedVariant == null) {
+          _selectedVariant = 'Medium';
+          _priceController.text = '3.50';
+        }
+        break;
+      case 'Cake Jar':
+        // Don't auto-fill price until variant is selected
+        // Set default to Regular if no variant selected
+        if (_selectedVariant == null) {
+          _selectedVariant = 'Regular';
+          _priceController.text = '9.50';
+        }
+        break;
+      default:
+        // For custom products, try to find the most recent price
+        _setPriceForProduct(productName);
+        _selectedVariant = null;
+    }
+  });
+}
+
+  Widget _buildRecentProducts() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text(
+          'Recent Products:',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _availableProducts.take(6).map((product) {
+            return InputChip(
+              label: Text(product),
+              onPressed: () {
+                setState(() {
+                  _isCustomProduct = false;
+                  _selectedProduct = product;
+                  _nameController.text = product;
+                  _selectedMacaronSize = null;
+                  _autoFillPrice(product);
+                });
+              },
+              backgroundColor: _selectedProduct == product 
+                  ? const Color(0xFFD4AF37).withOpacity(0.2)
+                  : Colors.grey[200],
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  void _setPriceForProduct(String productName) {
+    // Try to find the most recent price for this product
+    try {
+      final existingItem = _cartItems.firstWhere(
+        (item) => item.name.toLowerCase() == productName.toLowerCase(),
+        orElse: () => CartItem(name: '', price: 0, quantity: 0),
+      );
+      
+      if (existingItem.name.isNotEmpty) {
+        _priceController.text = existingItem.price.toStringAsFixed(2);
+        return;
+      }
+    } catch (e) {
+      // Ignore error and proceed
+    }
+    
+    // If not found in current cart, clear the price field
+    _priceController.clear();
+  }
+
+  // Rest of your existing methods remain mostly the same...
+  // Only _addToCart needs modification to include size in product name
 
   Widget _buildCartSection() {
     return Container(
@@ -493,26 +866,42 @@ class _SaleCalculator extends State<SaleCalculator> {
   }
 
   void _addToCart() {
-    if (_formKey.currentState!.validate()) {
-      final name = _nameController.text;
-      final price = double.parse(_priceController.text);
+  if (_formKey.currentState!.validate()) {
+    String name = _nameController.text;
+    final price = double.parse(_priceController.text);
 
-      final existingIndex = _cartItems.indexWhere(
-        (item) => item.name.toLowerCase() == name.toLowerCase(),
-      );
-
-      setState(() {
-        if (existingIndex >= 0) {
-          _cartItems[existingIndex].quantity++;
-        } else {
-          _cartItems.add(CartItem(name: name, price: price, quantity: 1));
-        }
-
-        _nameController.clear();
-        _priceController.clear();
-      });
+    // Add variant to product name if applicable
+    if ((_selectedProduct == 'Macaron' || _selectedProduct == 'Cake Jar') && 
+        _selectedVariant != null) {
+      name = '$_selectedProduct ($_selectedVariant)';
     }
+
+    final existingIndex = _cartItems.indexWhere(
+      (item) => item.name.toLowerCase() == name.toLowerCase(),
+    );
+
+    setState(() {
+      if (existingIndex >= 0) {
+        _cartItems[existingIndex].quantity++;
+      } else {
+        _cartItems.add(CartItem(name: name, price: price, quantity: 1));
+        
+        // Add to available products if it's a new product
+        if (!_availableProducts.contains(name)) {
+          _availableProducts.add(name);
+          _availableProducts.sort();
+        }
+      }
+
+      // Reset form
+      _nameController.clear();
+      _priceController.clear();
+      _selectedProduct = null;
+      _isCustomProduct = false;
+      _selectedVariant = null;
+    });
   }
+}
 
   void _incrementQuantity(int index) {
     setState(() {
