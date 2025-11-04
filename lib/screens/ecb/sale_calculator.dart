@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-
-// *******************************************SHOPPING CART VIEW*********************************
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SaleCalculator extends StatefulWidget {
-  const SaleCalculator({super.key});
+  final Map<String, dynamic>? existingSale;
+
+  const SaleCalculator({super.key, this.existingSale});
 
   @override
   State<SaleCalculator> createState() => _SaleCalculator();
@@ -14,15 +15,20 @@ class SaleCalculator extends StatefulWidget {
 class _SaleCalculator extends State<SaleCalculator> {
   final List<CartItem> _cartItems = [];
   final _formKey = GlobalKey<FormState>();
-  
   final _nameController = TextEditingController();
   final _priceController = TextEditingController();
   final _taxController = TextEditingController(text: '1.75');
-  
+
+  String? _saleId;
   DateTime _selectedDate = DateTime.now();
+  bool _isSaving = false;
+  final _supabase = Supabase.instance.client;
 
   double get _subtotal {
-    return _cartItems.fold(0, (sum, item) => sum + (item.quantity * item.price));
+    return _cartItems.fold(
+      0,
+      (sum, item) => sum + (item.quantity * item.price),
+    );
   }
 
   double get _taxRate => double.tryParse(_taxController.text) ?? 0;
@@ -30,21 +36,62 @@ class _SaleCalculator extends State<SaleCalculator> {
   double get _total => _subtotal + _taxAmount;
 
   @override
+  void initState() {
+    super.initState();
+
+    // Load existing sale data if editing
+    if (widget.existingSale != null) {
+      _loadExistingSale();
+    }
+  }
+
+  void _loadExistingSale() {
+    final sale = widget.existingSale!;
+    _saleId = sale['id'];
+    _selectedDate = DateTime.parse(sale['sale_date']);
+    _taxController.text = (sale['tax_rate'] as num).toStringAsFixed(2);
+
+    // Load items
+    final items = List<Map<String, dynamic>>.from(sale['sale_items'] ?? []);
+    for (var item in items) {
+      _cartItems.add(CartItem(
+        name: item['product_name'],
+        price: (item['price'] as num).toDouble(),
+        quantity: item['quantity'] as int,
+      ));
+    }
+
+    setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isWideScreen = MediaQuery.of(context).size.width > 600;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Shopping Cart'),
+        title: Text(_saleId != null ? 'Edit Sale' : 'Shopping Cart'),
         backgroundColor: const Color(0xFFD4AF37),
         foregroundColor: Colors.white,
         actions: [
           if (_cartItems.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.save),
-              onPressed: _saveSale,
-              tooltip: 'Save Sale',
-            ),
+            _isSaving
+                ? const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.save),
+                    onPressed: _saveSale,
+                    tooltip: 'Save Sale',
+                  ),
         ],
       ),
       body: isWideScreen ? _buildWideLayout() : _buildMobileLayout(),
@@ -55,18 +102,9 @@ class _SaleCalculator extends State<SaleCalculator> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          flex: 1,
-          child: _buildProductsSection(),
-        ),
-        Container(
-          width: 1,
-          color: Colors.grey[300],
-        ),
-        Expanded(
-          flex: 1,
-          child: _buildCartSection(),
-        ),
+        Expanded(flex: 1, child: _buildProductsSection()),
+        Container(width: 1, color: Colors.grey[300]),
+        Expanded(flex: 1, child: _buildCartSection()),
       ],
     );
   }
@@ -130,12 +168,15 @@ class _SaleCalculator extends State<SaleCalculator> {
                         controller: _priceController,
                         decoration: InputDecoration(
                           labelText: 'Price',
+                          prefixText: '\$',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
                           prefixIcon: const Icon(Icons.attach_money),
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                       ),
                       const SizedBox(height: 16),
@@ -183,12 +224,14 @@ class _SaleCalculator extends State<SaleCalculator> {
                     color: Colors.grey[800],
                   ),
                 ),
-                // Date selector
                 InkWell(
                   onTap: _selectDate,
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       border: Border.all(color: const Color(0xFFD4AF37)),
                       borderRadius: BorderRadius.circular(8),
@@ -218,8 +261,7 @@ class _SaleCalculator extends State<SaleCalculator> {
               ],
             ),
           ),
-          
-          // Cart Items
+
           if (_cartItems.isEmpty)
             Padding(
               padding: const EdgeInsets.all(40),
@@ -234,10 +276,7 @@ class _SaleCalculator extends State<SaleCalculator> {
                     const SizedBox(height: 16),
                     Text(
                       'Your cart is empty',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[500],
-                      ),
+                      style: TextStyle(fontSize: 16, color: Colors.grey[500]),
                     ),
                   ],
                 ),
@@ -282,8 +321,6 @@ class _SaleCalculator extends State<SaleCalculator> {
                               ],
                             ),
                           ),
-                          
-                          // Quantity controls
                           Container(
                             decoration: BoxDecoration(
                               border: Border.all(color: Colors.grey[300]!),
@@ -301,7 +338,9 @@ class _SaleCalculator extends State<SaleCalculator> {
                                   padding: EdgeInsets.zero,
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
                                   child: Text(
                                     '${item.quantity}',
                                     style: const TextStyle(
@@ -322,12 +361,12 @@ class _SaleCalculator extends State<SaleCalculator> {
                               ],
                             ),
                           ),
-                          
                           const SizedBox(width: 12),
-                          
-                          // Remove button
                           IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
+                            ),
                             onPressed: () => _removeFromCart(index),
                           ),
                         ],
@@ -337,8 +376,7 @@ class _SaleCalculator extends State<SaleCalculator> {
                 },
               ),
             ),
-          
-          // Summary Section
+
           if (_cartItems.isNotEmpty)
             Container(
               margin: const EdgeInsets.all(20),
@@ -354,16 +392,11 @@ class _SaleCalculator extends State<SaleCalculator> {
                 children: [
                   _summaryRow('Subtotal', _subtotal),
                   const SizedBox(height: 12),
-                  
-                  // Tax rate input
                   Row(
                     children: [
-                      const Text(
-                        'Tax',
-                        style: TextStyle(fontSize: 16),
-                      ),
+                      const Text('Tax', style: TextStyle(fontSize: 16)),
                       const SizedBox(width: 8),
-                      Container(
+                      SizedBox(
                         width: 70,
                         height: 36,
                         child: TextFormField(
@@ -371,14 +404,20 @@ class _SaleCalculator extends State<SaleCalculator> {
                           textAlign: TextAlign.center,
                           decoration: InputDecoration(
                             suffixText: '%',
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
                           ),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*\.?\d{0,2}'),
+                            ),
                           ],
                           onChanged: (value) => setState(() {}),
                         ),
@@ -393,9 +432,7 @@ class _SaleCalculator extends State<SaleCalculator> {
                       ),
                     ],
                   ),
-                  
                   const Divider(height: 24, thickness: 2),
-                  
                   _summaryRow('Total', _total, isTotal: true),
                 ],
               ),
@@ -447,7 +484,7 @@ class _SaleCalculator extends State<SaleCalculator> {
         );
       },
     );
-    
+
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
@@ -459,33 +496,21 @@ class _SaleCalculator extends State<SaleCalculator> {
     if (_formKey.currentState!.validate()) {
       final name = _nameController.text;
       final price = double.parse(_priceController.text);
-      
-      final existingIndex = _cartItems.indexWhere((item) => 
-        item.name.toLowerCase() == name.toLowerCase()
+
+      final existingIndex = _cartItems.indexWhere(
+        (item) => item.name.toLowerCase() == name.toLowerCase(),
       );
-      
+
       setState(() {
         if (existingIndex >= 0) {
           _cartItems[existingIndex].quantity++;
         } else {
-          _cartItems.add(CartItem(
-            name: name,
-            price: price,
-            quantity: 1,
-          ));
+          _cartItems.add(CartItem(name: name, price: price, quantity: 1));
         }
-        
+
         _nameController.clear();
         _priceController.clear();
       });
-      
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(
-      //     content: Text('$name added to cart'),
-      //     duration: const Duration(seconds: 1),
-      //     behavior: SnackBarBehavior.floating,
-      //   ),
-      // );
     }
   }
 
@@ -512,41 +537,121 @@ class _SaleCalculator extends State<SaleCalculator> {
   }
 
   void _saveSale() async {
-    // TODO: Save to Supabase
-    // final supabase = Supabase.instance.client;
-    // await supabase.from('sales').insert({
-    //   'sale_date': _selectedDate.toIso8601String(),
-    //   'items': _cartItems.map((e) => e.toJson()).toList(),
-    //   'subtotal': _subtotal,
-    //   'tax': _taxAmount,
-    //   'tax_rate': _taxRate,
-    //   'total': _total,
-    // });
-    
-    if (mounted) {
+    if (_cartItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white),
-              const SizedBox(width: 12),
-              Text('Sale saved! Total: \$${_total.toStringAsFixed(2)}'),
-            ],
-          ),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
+        const SnackBar(content: Text('Cart is empty!')),
       );
-      
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      if (_saleId != null) {
+        // UPDATE existing sale
+        await _supabase.from('sales').update({
+          'sale_date': _selectedDate.toIso8601String().split('T')[0],
+          'subtotal': _subtotal,
+          'tax_amount': _taxAmount,
+          'tax_rate': _taxRate,
+          'total': _total,
+        }).eq('id', _saleId!);
+
+        // Delete old items
+        await _supabase.from('sale_items').delete().eq('sale_id', _saleId!);
+
+        // Insert new items
+        final saleItemsData = _cartItems.map((item) {
+          return {
+            'sale_id': _saleId,
+            'product_name': item.name,
+            'quantity': item.quantity,
+            'price': item.price,
+            'line_total': item.quantity * item.price,
+          };
+        }).toList();
+
+        await _supabase.from('sale_items').insert(saleItemsData);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 12),
+                  Text('Sale updated successfully!'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else {
+        // CREATE new sale
+        final saleResponse = await _supabase
+            .from('sales')
+            .insert({
+              'sale_date': _selectedDate.toIso8601String().split('T')[0],
+              'subtotal': _subtotal,
+              'tax_amount': _taxAmount,
+              'tax_rate': _taxRate,
+              'total': _total,
+            })
+            .select()
+            .single();
+
+        final saleId = saleResponse['id'];
+
+        final saleItemsData = _cartItems.map((item) {
+          return {
+            'sale_id': saleId,
+            'product_name': item.name,
+            'quantity': item.quantity,
+            'price': item.price,
+            'line_total': item.quantity * item.price,
+          };
+        }).toList();
+
+        await _supabase.from('sale_items').insert(saleItemsData);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Text('Sale saved! Total: \$${_total.toStringAsFixed(2)}'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+
       Future.delayed(const Duration(seconds: 1), () {
         if (mounted) {
-          setState(() {
-            _cartItems.clear();
-            _selectedDate = DateTime.now(); // Reset date
-          });
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         }
       });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving sale: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -564,15 +669,5 @@ class CartItem {
   final double price;
   int quantity;
 
-  CartItem({
-    required this.name,
-    required this.price,
-    required this.quantity,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'price': price,
-    'quantity': quantity,
-  };
+  CartItem({required this.name, required this.price, required this.quantity});
 }
