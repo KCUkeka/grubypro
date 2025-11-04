@@ -149,52 +149,64 @@ class _SaleCalculator extends State<SaleCalculator> {
     );
   }
 
-  Widget _buildMobileLayout() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildProductsSection(),
-          Divider(thickness: 2, color: Colors.grey[300]),
-          _buildCartSection(),
-        ],
+Widget _buildMobileLayout() {
+  return Column(
+    children: [
+      // Products Section - Reduced height for mobile
+      SizedBox(
+        height: MediaQuery.of(context).size.height * 0.4, // Reduced from 50% to 40%
+        child: _buildProductsSection(),
       ),
-    );
-  }
+      Divider(thickness: 2, color: Colors.grey[300]),
+      // Cart Section - More space now (60% instead of 50%)
+      Expanded(
+        child: _buildCartSection(),
+      ),
+    ],
+  );
+}
 
   Widget _buildProductsSection() {
-    return Container(
-      color: Colors.grey[50],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Text(
-              'Products',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
+  final isMobile = MediaQuery.of(context).size.width <= 600;
+  
+  return Container(
+    color: Colors.grey[50],
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Smaller header for mobile
+        Padding(
+          padding: EdgeInsets.all(isMobile ? 12 : 20),
+          child: Text(
+            'Products',
+            style: TextStyle(
+              fontSize: isMobile ? 18 : 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[800],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+        ),
+        // More compact form for mobile
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20),
             child: Card(
               elevation: 2,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(isMobile ? 16 : 20),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Product Selection Dropdown with Free Text Option
+                      // Product Selection
                       _buildProductInputField(),
-                      const SizedBox(height: 16),
+                      SizedBox(height: isMobile ? 12 : 16),
+                      
+                      // Price Input
                       TextFormField(
                         controller: _priceController,
                         decoration: InputDecoration(
@@ -203,13 +215,16 @@ class _SaleCalculator extends State<SaleCalculator> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           prefixIcon: const Icon(Icons.attach_money),
+                          isDense: isMobile, // Reduces height on mobile
                         ),
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
                         validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: isMobile ? 12 : 16),
+                      
+                      // Add to Cart Button
                       ElevatedButton.icon(
                         onPressed: _addToCart,
                         icon: const Icon(Icons.add_shopping_cart),
@@ -217,26 +232,29 @@ class _SaleCalculator extends State<SaleCalculator> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF00BCD4),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: EdgeInsets.symmetric(vertical: isMobile ? 12 : 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      if (_availableProducts.isNotEmpty)
+                      
+                      // Recent Products (only show if there's space)
+                      if (_availableProducts.isNotEmpty) ...[
+                        SizedBox(height: isMobile ? 12 : 16),
                         _buildRecentProducts(),
+                      ],
                     ],
                   ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildProductInputField() {
   // Define the main product options
@@ -517,43 +535,76 @@ void _autoFillPrice(String productName) {
 }
 
   Widget _buildRecentProducts() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 16),
-        Text(
-          'Recent Products:',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[700],
-          ),
+  final isMobile = MediaQuery.of(context).size.width <= 600;
+  
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'Recent Products:',
+        style: TextStyle(
+          fontSize: isMobile ? 12 : 14,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey[700],
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _availableProducts.take(6).map((product) {
-            return InputChip(
-              label: Text(product),
-              onPressed: () {
-                setState(() {
-                  _isCustomProduct = false;
-                  _selectedProduct = product;
-                  _nameController.text = product;
-                  _selectedMacaronSize = null;
-                  _autoFillPrice(product);
-                });
-              },
-              backgroundColor: _selectedProduct == product 
-                  ? const Color(0xFFD4AF37).withOpacity(0.2)
-                  : Colors.grey[200],
-            );
-          }).toList(),
+      ),
+      const SizedBox(height: 8),
+      SizedBox(
+        height: isMobile ? 60 : null, // Fixed height on mobile
+        child: SingleChildScrollView(
+          scrollDirection: isMobile ? Axis.horizontal : Axis.vertical,
+          child: isMobile 
+              ? Row(
+                  children: _availableProducts.take(6).map((product) {
+                    return Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      child: InputChip(
+                        label: Text(
+                          product,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _isCustomProduct = false;
+                            _selectedProduct = product;
+                            _nameController.text = product;
+                            _selectedVariant = null;
+                            _autoFillPrice(product);
+                          });
+                        },
+                        backgroundColor: _selectedProduct == product 
+                            ? const Color(0xFFD4AF37).withOpacity(0.2)
+                            : Colors.grey[200],
+                      ),
+                    );
+                  }).toList(),
+                )
+              : Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _availableProducts.take(6).map((product) {
+                    return InputChip(
+                      label: Text(product),
+                      onPressed: () {
+                        setState(() {
+                          _isCustomProduct = false;
+                          _selectedProduct = product;
+                          _nameController.text = product;
+                          _selectedVariant = null;
+                          _autoFillPrice(product);
+                        });
+                      },
+                      backgroundColor: _selectedProduct == product 
+                          ? const Color(0xFFD4AF37).withOpacity(0.2)
+                          : Colors.grey[200],
+                    );
+                  }).toList(),
+                ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
   void _setPriceForProduct(String productName) {
     // Try to find the most recent price for this product
@@ -579,264 +630,363 @@ void _autoFillPrice(String productName) {
   // Only _addToCart needs modification to include size in product name
 
   Widget _buildCartSection() {
-    return Container(
-      color: Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Your Cart',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
-                  ),
+  final screenWidth = MediaQuery.of(context).size.width;
+  final screenHeight = MediaQuery.of(context).size.height;
+  final isWideScreen = screenWidth > 600;
+  
+  return Container(
+    color: Colors.white,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header with date picker
+        Container(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Your Cart',
+                style: TextStyle(
+                  fontSize: isWideScreen ? 22 : 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
                 ),
-                InkWell(
-                  onTap: _selectDate,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFD4AF37)),
-                      borderRadius: BorderRadius.circular(8),
-                      color: const Color(0xFFD4AF37).withOpacity(0.1),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.calendar_today,
-                          size: 16,
+              ),
+              InkWell(
+                onTap: _selectDate,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0xFFD4AF37)),
+                    borderRadius: BorderRadius.circular(8),
+                    color: const Color(0xFFD4AF37).withOpacity(0.1),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.calendar_today,
+                        size: isWideScreen ? 16 : 14,
+                        color: Colors.grey[700],
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        DateFormat('MMM dd, yyyy').format(_selectedDate),
+                        style: TextStyle(
+                          fontSize: isWideScreen ? 14 : 12,
+                          fontWeight: FontWeight.w600,
                           color: Colors.grey[700],
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          DateFormat('MMM dd, yyyy').format(_selectedDate),
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[700],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Cart items or empty state
+        if (_cartItems.isEmpty)
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.shopping_cart_outlined,
+                    size: isWideScreen ? 80 : 60,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Your cart is empty',
+                    style: TextStyle(
+                      fontSize: isWideScreen ? 18 : 16,
+                      color: Colors.grey[500],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Add products to get started',
+                    style: TextStyle(
+                      fontSize: isWideScreen ? 14 : 12,
+                      color: Colors.grey[400],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          // Cart items list with flexible height
+          Expanded(
+            child: Column(
+              children: [
+                // Cart items header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: Colors.grey[50],
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Items (${_cartItems.length})',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                          fontSize: isWideScreen ? 16 : 14,
+                        ),
+                      ),
+                      Text(
+                        'Quantity',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                          fontSize: isWideScreen ? 16 : 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Scrollable cart items
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    itemCount: _cartItems.length,
+                    itemBuilder: (context, index) {
+                      final item = _cartItems[index];
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Card(
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                // Product info
+                                Expanded(
+                                  flex: 2,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.name,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: isWideScreen ? 16 : 14,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        maxLines: 2,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '\$${item.price.toStringAsFixed(2)} each',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: isWideScreen ? 14 : 12,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Total: \$${(item.quantity * item.price).toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          color: const Color(0xFFD4AF37),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: isWideScreen ? 14 : 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                
+                                // Quantity controls
+                                Expanded(
+                                  flex: 1,
+                                  child: Column(
+                                    children: [
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(color: Colors.grey[300]!),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            IconButton(
+                                              icon: Icon(Icons.remove, 
+                                                  size: isWideScreen ? 20 : 18),
+                                              onPressed: () => _decrementQuantity(index),
+                                              constraints: const BoxConstraints(
+                                                minWidth: 36,
+                                                minHeight: 36,
+                                              ),
+                                              padding: EdgeInsets.zero,
+                                            ),
+                                            Text(
+                                              '${item.quantity}',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: isWideScreen ? 16 : 14,
+                                              ),
+                                            ),
+                                            IconButton(
+                                              icon: Icon(Icons.add, 
+                                                  size: isWideScreen ? 20 : 18),
+                                              onPressed: () => _incrementQuantity(index),
+                                              constraints: const BoxConstraints(
+                                                minWidth: 36,
+                                                minHeight: 36,
+                                              ),
+                                              padding: EdgeInsets.zero,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: TextButton.icon(
+                                          icon: Icon(
+                                            Icons.delete_outline,
+                                            size: isWideScreen ? 16 : 14,
+                                          ),
+                                          label: Text(
+                                            'Remove',
+                                            style: TextStyle(
+                                              fontSize: isWideScreen ? 12 : 10,
+                                            ),
+                                          ),
+                                          onPressed: () => _removeFromCart(index),
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: Colors.red,
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ),
               ],
             ),
           ),
 
-          if (_cartItems.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(40),
-              child: Center(
-                child: Column(
+        // Summary section - only show if there are items
+        if (_cartItems.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD4AF37).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFD4AF37).withOpacity(0.3),
+              ),
+            ),
+            child: Column(
+              children: [
+                _summaryRow('Subtotal', _subtotal, isWideScreen: isWideScreen),
+                const SizedBox(height: 12),
+                Row(
                   children: [
-                    Icon(
-                      Icons.shopping_cart_outlined,
-                      size: 80,
-                      color: Colors.grey[300],
+                    Expanded(
+                      child: Text('Tax Rate', style: TextStyle(
+                        fontSize: isWideScreen ? 16 : 14
+                      )),
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Your cart is empty',
-                      style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+                    SizedBox(
+                      width: isWideScreen ? 80 : 70,
+                      height: 40,
+                      child: TextFormField(
+                        controller: _taxController,
+                        textAlign: TextAlign.center,
+                        decoration: InputDecoration(
+                          suffixText: '%',
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,2}'),
+                          ),
+                        ],
+                        onChanged: (value) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        'Tax: \$${_taxAmount.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: isWideScreen ? 16 : 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
                     ),
                   ],
                 ),
-              ),
-            )
-          else
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _cartItems.length,
-                itemBuilder: (context, index) {
-                  final item = _cartItems[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '\$${item.price.toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey[300]!),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.remove, size: 18),
-                                  onPressed: () => _decrementQuantity(index),
-                                  constraints: const BoxConstraints(
-                                    minWidth: 32,
-                                    minHeight: 32,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                  ),
-                                  child: Text(
-                                    '${item.quantity}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.add, size: 18),
-                                  onPressed: () => _incrementQuantity(index),
-                                  constraints: const BoxConstraints(
-                                    minWidth: 32,
-                                    minHeight: 32,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
-                            ),
-                            onPressed: () => _removeFromCart(index),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
+                const Divider(height: 20, thickness: 2),
+                _summaryRow('Total', _total, 
+                    isTotal: true, isWideScreen: isWideScreen),
+              ],
             ),
-
-          if (_cartItems.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.all(20),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFD4AF37).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFD4AF37).withOpacity(0.3),
-                ),
-              ),
-              child: Column(
-                children: [
-                  _summaryRow('Subtotal', _subtotal),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Text('Tax', style: TextStyle(fontSize: 16)),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 70,
-                        height: 36,
-                        child: TextFormField(
-                          controller: _taxController,
-                          textAlign: TextAlign.center,
-                          decoration: InputDecoration(
-                            suffixText: '%',
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d*\.?\d{0,2}'),
-                            ),
-                          ],
-                          onChanged: (value) => setState(() {}),
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '\$${_taxAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 24, thickness: 2),
-                  _summaryRow('Total', _total, isTotal: true),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryRow(String label, double amount, {bool isTotal = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isTotal ? 20 : 16,
-            fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
           ),
-        ),
-        Text(
-          '\$${amount.toStringAsFixed(2)}',
-          style: TextStyle(
-            fontSize: isTotal ? 24 : 16,
-            fontWeight: FontWeight.bold,
-            color: isTotal ? const Color(0xFFD4AF37) : Colors.black87,
-          ),
-        ),
       ],
-    );
-  }
+    ),
+  );
+}
+
+  Widget _summaryRow(String label, double amount, 
+    {bool isTotal = false, bool isWideScreen = true}) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: isTotal 
+              ? (isWideScreen ? 20 : 18) 
+              : (isWideScreen ? 16 : 14),
+          fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
+        ),
+      ),
+      Text(
+        '\$${amount.toStringAsFixed(2)}',
+        style: TextStyle(
+          fontSize: isTotal 
+              ? (isWideScreen ? 24 : 20) 
+              : (isWideScreen ? 16 : 14),
+          fontWeight: FontWeight.bold,
+          color: isTotal ? const Color(0xFFD4AF37) : Colors.black87,
+        ),
+      ),
+    ],
+  );
+}
 
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(

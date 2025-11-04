@@ -16,8 +16,8 @@ class _EcbHomeScreenState extends State<EcbHomeScreen> {
 
   final List<Widget> _screens = [
     const SalesScreen(),
-    const ReceiptsScreen(),
     const InvoiceScreen(),
+    const ReceiptsScreen(),
     const DrivingScreen(),
   ];
 
@@ -37,12 +37,12 @@ class _EcbHomeScreenState extends State<EcbHomeScreen> {
             label: 'Sales',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.receipt_long),
-            label: 'Receipts',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.description),
             label: 'Invoice',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.receipt_long),
+            label: 'Receipts',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.directions_car),
