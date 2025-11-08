@@ -33,6 +33,8 @@ dependencies:
   desktop_updater: ^1.4.0
   printing: ^5.14.2
   pdf: ^3.11.3
+  cloudinary_flutter: ^1.3.0
+  cloudinary: ^1.2.0
 
 
 dev_dependencies:
