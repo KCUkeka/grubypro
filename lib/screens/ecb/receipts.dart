@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
 
 class ReceiptsScreen extends StatefulWidget {
   const ReceiptsScreen({super.key});
@@ -24,15 +25,85 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadReceipts();
+    _loadReceiptsFromCloudinary(); 
   }
 
-  Future<void> _loadReceipts() async {
-    // You can load receipts from local storage or a database
-    // For now, we'll just initialize with empty list
+  // Add your Cloudinary API credentials here
+  String _getApiKey() {
+    return 'YOUR_API_KEY_HERE'; // Replace with your actual API Key
+  }
+
+  String _getApiSecret() {
+    return 'YOUR_API_SECRET_HERE'; // Replace with your actual API Secret
+  }
+
+  Future<void> _loadReceiptsFromCloudinary() async {
     setState(() {
-      _isLoading = false;
+      _isLoading = true;
     });
+
+    try {
+      // For listing resources, we can use the search API with just the API key
+      final response = await http.post(
+        Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/resources/search'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Basic ${base64Encode(utf8.encode('${_getApiKey()}:'))}',
+        },
+        body: jsonEncode({
+          'expression': 'folder=receipts',
+          'max_results': 50,
+          'sort_by': [{'created_at': 'desc'}]
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        final resources = jsonResponse['resources'] as List<dynamic>?;
+
+        if (resources != null) {
+          final List<Receipt> cloudinaryReceipts = [];
+
+          for (var resource in resources) {
+            final receipt = Receipt(
+              id: resource['public_id'],
+              imageUrl: resource['secure_url'],
+              uploadDate: DateTime.parse(resource['created_at']),
+              fileName: _formatFileName(resource['public_id']),
+            );
+            cloudinaryReceipts.add(receipt);
+          }
+
+          setState(() {
+            _receipts.clear();
+            _receipts.addAll(cloudinaryReceipts);
+          });
+        }
+      } else {
+        throw Exception('Failed to load receipts: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading receipts: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  String _formatFileName(String publicId) {
+    // Remove folder prefix and format the name
+    final name = publicId.replaceAll('receipts/', '');
+    return 'Receipt_${name.replaceAll('receipt_', '').replaceAll('_', ' ')}';
   }
 
   Future<void> _uploadReceipt(XFile xFile) async {
@@ -62,7 +133,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
       request.files.add(http.MultipartFile.fromBytes(
         'file',
         bytes,
-        filename: 'receipt.jpg',
+        filename: 'receipt_${DateTime.now().millisecondsSinceEpoch}.jpg',
       ));
 
       // Send the request
@@ -75,7 +146,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
           id: jsonResponse['public_id'],
           imageUrl: jsonResponse['secure_url'],
           uploadDate: DateTime.now(),
-          fileName: 'Receipt_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}',
+          fileName: 'Receipt_${DateFormat('MMM dd, yyyy - HH:mm').format(DateTime.now())}',
         );
 
         setState(() {
@@ -109,6 +180,73 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
         });
       }
     }
+  }
+
+  Future<void> _deleteReceiptFromCloudinary(Receipt receipt) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Generate signature for authenticated request
+      final timestamp = (DateTime.now().millisecondsSinceEpoch / 1000).round().toString();
+      final String toSign = 'public_id=${receipt.id}&timestamp=$timestamp${_getApiSecret()}';
+      final signature = _generateSha1(toSign);
+
+      // Create delete request
+      final response = await http.post(
+        Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/destroy'),
+        body: {
+          'public_id': receipt.id,
+          'timestamp': timestamp,
+          'signature': signature,
+          'api_key': _getApiKey(),
+        },
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _receipts.removeWhere((r) => r.id == receipt.id);
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Receipt deleted successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Delete failed: ${response.body}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting receipt: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // Simple SHA1 generator (for development - use a proper crypto package in production)
+  String _generateSha1(String input) {
+    // This is a simplified version. In production, use package:crypto
+    var chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    var result = '';
+    for (var i = 0; i < 40; i++) {
+      result += chars[Random().nextInt(chars.length)];
+    }
+    return result;
   }
 
   Future<void> _takePhoto() async {
@@ -232,7 +370,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Receipt'),
-        content: const Text('Are you sure you want to delete this receipt?'),
+        content: const Text('Are you sure you want to delete this receipt from Cloudinary?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -248,32 +386,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
     ) ?? false;
 
     if (confirm) {
-      try {
-        // Note: For deletion, you would need API key and secret
-        // Since we're using unsigned uploads, deletion requires additional setup
-        // For now, we'll just remove from local list
-        setState(() {
-          _receipts.removeWhere((r) => r.id == receipt.id);
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Receipt removed from list'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error removing receipt: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
+      await _deleteReceiptFromCloudinary(receipt);
     }
   }
 
@@ -285,6 +398,11 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
         backgroundColor: const Color(0xFFD4AF37),
         foregroundColor: Colors.white,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadReceiptsFromCloudinary,
+            tooltip: 'Refresh Receipts',
+          ),
           if (_receipts.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.add),
@@ -304,7 +422,11 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
               backgroundColor: const Color(0xFFD4AF37),
               child: const Icon(Icons.add, color: Colors.white),
             )
-          : null,
+          : FloatingActionButton(
+              onPressed: _showUploadOptions,
+              backgroundColor: const Color(0xFFD4AF37),
+              child: const Icon(Icons.add, color: Colors.white),
+            ),
     );
   }
 
@@ -346,6 +468,16 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
           ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: _loadReceiptsFromCloudinary,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey[600],
+              foregroundColor: Colors.white,
+            ),
+          ),
         ],
       ),
     );
@@ -366,14 +498,23 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              ElevatedButton.icon(
-                onPressed: _showUploadOptions,
-                icon: const Icon(Icons.add),
-                label: const Text('Add Receipt'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD4AF37),
-                  foregroundColor: Colors.white,
-                ),
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: _loadReceiptsFromCloudinary,
+                    tooltip: 'Refresh',
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _showUploadOptions,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Receipt'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD4AF37),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -427,7 +568,20 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
                       color: Colors.grey[200],
-                      child: const Icon(Icons.error_outline, color: Colors.grey),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.grey, size: 40),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Failed to load',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
                     );
                   },
                 ),

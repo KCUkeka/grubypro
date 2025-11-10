@@ -35,6 +35,7 @@ dependencies:
   pdf: ^3.11.3
   cloudinary_flutter: ^1.3.0
   cloudinary: ^1.2.0
+  crypto: ^3.0.7
 
 
 dev_dependencies:
