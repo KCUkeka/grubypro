@@ -1,0 +1,34 @@
+{
+  "appName": "GrubyPro",
+  "description": "Multi-App Suite: Gruby, PayPro, ECB",
+  "items": [
+    {
+      "version": "1.0.1",
+      "shortVersion": 2,
+      "changes": [
+        {
+          "type": "feat",
+          "message": "Added auto-update functionality"
+        }
+      ],
+      "date": "2025-11-28",
+      "mandatory": false,
+      "url": "https://raw.githubusercontent.com/KCUkeka/grubypro/main/releases/download/v1.0.1/grubypro.apk",
+      "platform": "mobile"
+    },
+    {
+      "version": "1.0.0",
+      "shortVersion": 1,
+      "changes": [
+        {
+          "type": "feat",
+          "message": "Initial release"
+        }
+      ],
+      "date": "2025-08-13",
+      "mandatory": false,
+      "url": "https://raw.githubusercontent.com/KCUkeka/grubypro/main/releases/download/v1.0.0/grubypro.apk",
+      "platform": "mobile"
+    }
+  ]
+}
