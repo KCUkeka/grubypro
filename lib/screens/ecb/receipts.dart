@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:math';
+import 'package:crypto/crypto.dart';
 
 class ReceiptsScreen extends StatefulWidget {
   const ReceiptsScreen({super.key});
@@ -25,85 +26,55 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadReceiptsFromCloudinary(); 
+    _initializeApp();
   }
 
-  // Add your Cloudinary API credentials here
-  String _getApiKey() {
-    return 'YOUR_API_KEY_HERE'; // Replace with your actual API Key
-  }
-
-  String _getApiSecret() {
-    return 'YOUR_API_SECRET_HERE'; // Replace with your actual API Secret
-  }
-
-  Future<void> _loadReceiptsFromCloudinary() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+  Future<void> _initializeApp() async {
     try {
-      // For listing resources, we can use the search API with just the API key
-      final response = await http.post(
-        Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/resources/search'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Basic ${base64Encode(utf8.encode('${_getApiKey()}:'))}',
-        },
-        body: jsonEncode({
-          'expression': 'folder=receipts',
-          'max_results': 50,
-          'sort_by': [{'created_at': 'desc'}]
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        final resources = jsonResponse['resources'] as List<dynamic>?;
-
-        if (resources != null) {
-          final List<Receipt> cloudinaryReceipts = [];
-
-          for (var resource in resources) {
-            final receipt = Receipt(
-              id: resource['public_id'],
-              imageUrl: resource['secure_url'],
-              uploadDate: DateTime.parse(resource['created_at']),
-              fileName: _formatFileName(resource['public_id']),
-            );
-            cloudinaryReceipts.add(receipt);
-          }
-
-          setState(() {
-            _receipts.clear();
-            _receipts.addAll(cloudinaryReceipts);
-          });
-        }
-      } else {
-        throw Exception('Failed to load receipts: ${response.statusCode}');
-      }
+      await dotenv.load(fileName: ".env");
+      // For web, we'll start with an empty list and rely on uploads
+      // Loading from Cloudinary requires a backend due to CORS
+      setState(() {
+        _isLoading = false;
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading receipts: $e'),
+            content: Text('Failed to initialize: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
     }
   }
 
-  String _formatFileName(String publicId) {
-    // Remove folder prefix and format the name
-    final name = publicId.replaceAll('receipts/', '');
-    return 'Receipt_${name.replaceAll('receipt_', '').replaceAll('_', ' ')}';
+  String _getApiKey() {
+    return dotenv.get('CLOUDINARY_API_KEY', fallback: '');
+  }
+
+  String _getApiSecret() {
+    return dotenv.get('CLOUDINARY_API_SECRET', fallback: '');
+  }
+
+  // Simple method to store receipts locally (for web compatibility)
+  void _saveReceiptsLocally() {
+    // Store in local storage for web persistence
+    final receiptsJson = _receipts.map((receipt) => {
+      'id': receipt.id,
+      'imageUrl': receipt.imageUrl,
+      'uploadDate': receipt.uploadDate.toIso8601String(),
+      'fileName': receipt.fileName,
+    }).toList();
+    
+    // For web, use shared_preferences or similar for persistence
+    // For now, we'll just keep it in memory
+  }
+
+  // Load receipts from local storage
+  void _loadReceiptsLocally() {
+    // In a real app, you'd load from shared_preferences or similar
+    // For now, we'll rely on the user uploading new receipts
   }
 
   Future<void> _uploadReceipt(XFile xFile) async {
@@ -112,31 +83,24 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
     });
 
     try {
-      // Create a unique public ID for the receipt
       final String publicId = 'receipt_${DateTime.now().millisecondsSinceEpoch}';
-
-      // Read the file as bytes
       final bytes = await xFile.readAsBytes();
 
-      // Create upload request
       var request = http.MultipartRequest(
         'POST',
         Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload'),
       );
 
-      // Add parameters for unsigned upload
       request.fields['upload_preset'] = _uploadPreset;
       request.fields['public_id'] = publicId;
       request.fields['folder'] = 'receipts';
 
-      // Add the image file as bytes
       request.files.add(http.MultipartFile.fromBytes(
         'file',
         bytes,
         filename: 'receipt_${DateTime.now().millisecondsSinceEpoch}.jpg',
       ));
 
-      // Send the request
       var response = await request.send();
       var responseData = await response.stream.bytesToString();
       var jsonResponse = jsonDecode(responseData);
@@ -152,6 +116,8 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
         setState(() {
           _receipts.insert(0, newReceipt);
         });
+
+        _saveReceiptsLocally();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -182,50 +148,59 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
     }
   }
 
-  Future<void> _deleteReceiptFromCloudinary(Receipt receipt) async {
+  // Alternative: Try to fetch using a different endpoint that might not have CORS issues
+  Future<void> _tryAlternativeLoad() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Generate signature for authenticated request
-      final timestamp = (DateTime.now().millisecondsSinceEpoch / 1000).round().toString();
-      final String toSign = 'public_id=${receipt.id}&timestamp=$timestamp${_getApiSecret()}';
-      final signature = _generateSha1(toSign);
-
-      // Create delete request
-      final response = await http.post(
-        Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/destroy'),
-        body: {
-          'public_id': receipt.id,
-          'timestamp': timestamp,
-          'signature': signature,
-          'api_key': _getApiKey(),
-        },
+      // This is a long shot, but let's try the regular resources endpoint
+      final response = await http.get(
+        Uri.parse('https://res.cloudinary.com/$_cloudName/image/list/receipts.json'),
       );
 
       if (response.statusCode == 200) {
-        setState(() {
-          _receipts.removeWhere((r) => r.id == receipt.id);
-        });
+        final jsonResponse = jsonDecode(response.body);
+        final resources = jsonResponse['resources'] as List<dynamic>?;
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Receipt deleted successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
+        if (resources != null) {
+          final List<Receipt> cloudinaryReceipts = [];
+
+          for (var resource in resources) {
+            final receipt = Receipt(
+              id: resource['public_id'],
+              imageUrl: 'https://res.cloudinary.com/$_cloudName/image/upload/${resource['public_id']}',
+              uploadDate: DateTime.parse(resource['created_at']),
+              fileName: _formatFileName(resource['public_id']),
+            );
+            cloudinaryReceipts.add(receipt);
+          }
+
+          setState(() {
+            _receipts.clear();
+            _receipts.addAll(cloudinaryReceipts);
+          });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Receipts loaded successfully!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
         }
       } else {
-        throw Exception('Delete failed: ${response.body}');
+        throw Exception('Alternative load failed: ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error deleting receipt: $e'),
-            backgroundColor: Colors.red,
+            content: Text('Alternative load also failed: $e\n\nFor web deployment, consider using a backend API to avoid CORS issues.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -238,15 +213,9 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
     }
   }
 
-  // Simple SHA1 generator (for development - use a proper crypto package in production)
-  String _generateSha1(String input) {
-    // This is a simplified version. In production, use package:crypto
-    var chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    var result = '';
-    for (var i = 0; i < 40; i++) {
-      result += chars[Random().nextInt(chars.length)];
-    }
-    return result;
+  String _formatFileName(String publicId) {
+    final name = publicId.replaceAll('receipts/', '');
+    return 'Receipt_${name.replaceAll('receipt_', '').replaceAll('_', ' ')}';
   }
 
   Future<void> _takePhoto() async {
@@ -370,7 +339,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Receipt'),
-        content: const Text('Are you sure you want to delete this receipt from Cloudinary?'),
+        content: const Text('Are you sure you want to delete this receipt?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -386,7 +355,20 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
     ) ?? false;
 
     if (confirm) {
-      await _deleteReceiptFromCloudinary(receipt);
+      setState(() {
+        _receipts.removeWhere((r) => r.id == receipt.id);
+      });
+      
+      _saveReceiptsLocally();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Receipt removed'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     }
   }
 
@@ -398,17 +380,25 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
         backgroundColor: const Color(0xFFD4AF37),
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadReceiptsFromCloudinary,
-            tooltip: 'Refresh Receipts',
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'alternative') {
+                _tryAlternativeLoad();
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'alternative',
+                child: Text('Try Load Existing Receipts'),
+              ),
+            ],
           ),
-          if (_receipts.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: _showUploadOptions,
-              tooltip: 'Upload Receipt',
-            ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _showUploadOptions,
+            tooltip: 'Upload Receipt',
+          ),
         ],
       ),
       body: _isLoading
@@ -416,17 +406,11 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
           : _receipts.isEmpty
               ? _buildEmptyState()
               : _buildReceiptsGrid(),
-      floatingActionButton: _receipts.isEmpty
-          ? FloatingActionButton(
-              onPressed: _showUploadOptions,
-              backgroundColor: const Color(0xFFD4AF37),
-              child: const Icon(Icons.add, color: Colors.white),
-            )
-          : FloatingActionButton(
-              onPressed: _showUploadOptions,
-              backgroundColor: const Color(0xFFD4AF37),
-              child: const Icon(Icons.add, color: Colors.white),
-            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showUploadOptions,
+        backgroundColor: const Color(0xFFD4AF37),
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 
@@ -456,6 +440,16 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
               fontSize: 16,
               color: Colors.grey,
             ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Note: Web version can upload but cannot load existing receipts due to browser security restrictions.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.orange,
+            ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 30),
           ElevatedButton.icon(
@@ -470,11 +464,11 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
           ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
-            onPressed: _loadReceiptsFromCloudinary,
+            onPressed: _tryAlternativeLoad,
             icon: const Icon(Icons.refresh),
-            label: const Text('Refresh'),
+            label: const Text('Try Load Existing Receipts'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey[600],
+              backgroundColor: Colors.blue,
               foregroundColor: Colors.white,
             ),
           ),
@@ -498,23 +492,14 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: _loadReceiptsFromCloudinary,
-                    tooltip: 'Refresh',
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: _showUploadOptions,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Receipt'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD4AF37),
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
+              ElevatedButton.icon(
+                onPressed: _showUploadOptions,
+                icon: const Icon(Icons.add),
+                label: const Text('Add Receipt'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4AF37),
+                  foregroundColor: Colors.white,
+                ),
               ),
             ],
           ),

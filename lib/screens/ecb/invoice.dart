@@ -1332,254 +1332,292 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
 }
 
   Future<Uint8List> _generatePdf() async {
-    final pdf = pw.Document();
+  final pdf = pw.Document();
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // Header
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'INVOICE',
-                        style: pw.TextStyle(
-                          fontSize: 24,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text('Invoice #: ${widget.invoiceData['id']}'),
-                      pw.Text(
-                        'Date: ${DateFormat('MMM dd, yyyy').format(DateTime.parse(widget.invoiceData['created_date']))}',
-                      ),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text(
-                        "Ethalle's Cakes and Bakes",
-                        style: pw.TextStyle(
-                          fontSize: 16,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.Text('Bolingbrook, IL 60490'),
-                      pw.Text('ethallebakes@gmail.com'),
-                      pw.Text('312-600-5810'),
-                    ],
-                  ),
-                ],
-              ),
-
-              pw.SizedBox(height: 20),
-
-              // Customer Information
-              if (widget.invoiceData['customer_name'] != null ||
-                  widget.invoiceData['customer_email'] != null ||
-                  widget.invoiceData['customer_phone'] != null)
+  pdf.addPage(
+    pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      build: (pw.Context context) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            // Header with Invoice Number, Date, and Order Number
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Logo Placeholder
                 pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
+                  width: 80,
+                  height: 80,
                   decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey300),
+                    color: PdfColors.grey200,
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
                   ),
+                  child: pw.Center(
+                    child: pw.Text(
+                      'LOGO',
+                      style: pw.TextStyle(
+                        color: PdfColor.fromInt(0xFFD4AF37),
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Invoice Info - Top Right
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text(
+                      'Invoice #${widget.invoiceData['id']}',
+                      style: pw.TextStyle(
+                        fontSize: 20,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                    pw.SizedBox(height: 8),
+                    pw.Text(
+                      'Issue date: ${DateFormat('MMM dd, yyyy').format(DateTime.parse(widget.invoiceData['created_date']))}',
+                    ),
+                    pw.Text('Order number: ${widget.invoiceData['id']}'),
+                  ],
+                ),
+              ],
+            ),
+
+            pw.SizedBox(height: 30),
+
+            // From and To sections
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // From section
+                pw.Expanded(
                   child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text(
-                        'Bill To:',
-                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        'From:',
+                        style: pw.TextStyle(
+                          fontWeight: pw.FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
+                      pw.SizedBox(height: 8),
+                      pw.Text(
+                        "Ethalle's Cakes and Bakes",
+                        style: pw.TextStyle(
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.Text('Illinois'),
+                      pw.Text('United States'),
+                      pw.Text('ethallebakes@gmail.com'),
+                      pw.Text('3126005810'),
+                    ],
+                  ),
+                ),
+
+                // To section
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'To:',
+                        style: pw.TextStyle(
+                          fontWeight: pw.FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      pw.SizedBox(height: 8),
                       if (widget.invoiceData['customer_name'] != null)
-                        pw.Text(widget.invoiceData['customer_name']),
+                        pw.Text(
+                          widget.invoiceData['customer_name'],
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
                       if (widget.invoiceData['customer_email'] != null)
                         pw.Text(widget.invoiceData['customer_email']),
                       if (widget.invoiceData['customer_phone'] != null)
-                        pw.Text(
-                          _formatPhoneForDisplay(
-                            widget.invoiceData['customer_phone'],
-                          ),
-                        ),
+                        pw.Text(_formatPhoneForDisplay(widget.invoiceData['customer_phone'])),
                     ],
                   ),
                 ),
+              ],
+            ),
 
-              pw.SizedBox(height: 20),
+            pw.SizedBox(height: 30),
 
-              // Items Table
-              pw.Text(
-                'Items',
-                style: pw.TextStyle(
-                  fontSize: 18,
-                  fontWeight: pw.FontWeight.bold,
+            // Product/Service Table Header
+            pw.Container(
+              decoration: pw.BoxDecoration(
+                color: PdfColors.yellow100,
+                borderRadius: const pw.BorderRadius.only(
+                  topLeft: pw.Radius.circular(4),
+                  topRight: pw.Radius.circular(4),
                 ),
               ),
-              pw.SizedBox(height: 10),
-
-              pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey300),
+              padding: const pw.EdgeInsets.all(12),
+              child: pw.Row(
                 children: [
-                  pw.TableRow(
-                    decoration: pw.BoxDecoration(color: PdfColors.grey200),
-                    children: [
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text(
-                          'Product',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
+                  pw.Expanded(
+                    flex: 3,
+                    child: pw.Text(
+                      'Product or Service',
+                      style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold,
                       ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text(
-                          'Date',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text(
-                          'Qty',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text(
-                          'Price',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text(
-                          'Total',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  ...widget.items.map((item) {
-                    return pw.TableRow(
-                      children: [
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(item['product_name']),
-                        ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(
-                            DateFormat(
-                              'MM/dd/yyyy',
-                            ).format(DateTime.parse(item['sale_date'])),
-                          ),
-                        ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(item['quantity'].toString()),
-                        ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(
-                            '\$${(item['price'] as num).toStringAsFixed(2)}',
-                          ),
-                        ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(
-                            '\$${(item['line_total'] as num).toStringAsFixed(2)}',
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
+                  pw.Expanded(
+                    child: pw.Text(
+                      'Quantity',
+                      style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                  ),
+                  pw.Expanded(
+                    child: pw.Text(
+                      'Discount',
+                      style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                  ),
+                  pw.Expanded(
+                    child: pw.Text(
+                      'Amount',
+                      style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                      textAlign: pw.TextAlign.right,
+                    ),
+                  ),
                 ],
               ),
+            ),
 
-              pw.SizedBox(height: 20),
-
-              // Totals
-              pw.Container(
-                alignment: pw.Alignment.centerRight,
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+            // Table Rows
+            ...widget.items.map((item) {
+              return pw.Container(
+                decoration: pw.BoxDecoration(
+                  border: pw.Border(
+                    bottom: pw.BorderSide(
+                      color: PdfColors.grey300,
+                      width: 1,
+                    ),
+                  ),
+                ),
+                padding: const pw.EdgeInsets.all(12),
+                child: pw.Row(
                   children: [
-                    pw.Row(
-                      mainAxisSize: pw.MainAxisSize.min,
-                      children: [
-                        pw.SizedBox(width: 100),
-                        pw.Text(
-                          'Subtotal: ',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
-                        pw.Text(
-                          '\$${(widget.invoiceData['subtotal'] as num).toStringAsFixed(2)}',
-                        ),
-                      ],
-                    ),
-                    pw.Row(
-                      mainAxisSize: pw.MainAxisSize.min,
-                      children: [
-                        pw.SizedBox(width: 100),
-                        pw.Text(
-                          'Tax: ',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
-                        pw.Text(
-                          '\$${(widget.invoiceData['tax_amount'] as num).toStringAsFixed(2)}',
-                        ),
-                      ],
-                    ),
-                    pw.Divider(),
-                    pw.Row(
-                      mainAxisSize: pw.MainAxisSize.min,
-                      children: [
-                        pw.SizedBox(width: 100),
-                        pw.Text(
-                          'TOTAL: ',
-                          style: pw.TextStyle(
-                            fontSize: 16,
-                            fontWeight: pw.FontWeight.bold,
+                    pw.Expanded(
+                      flex: 3,
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            item['product_name'],
+                            style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.normal,
+                            ),
                           ),
+                          if (item['description'] != null)
+                            pw.Text(
+                              item['description'],
+                              style: pw.TextStyle(
+                                fontSize: 10,
+                                color: PdfColors.grey600,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    pw.Expanded(
+                      child: pw.Text(
+                        item['quantity'].toString(),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                    ),
+                    pw.Expanded(
+                      child: pw.Text(
+                        item['discount'] != null && (item['discount'] as num) > 0
+                            ? '\$${(item['discount'] as num).toStringAsFixed(2)}'
+                            : '-',
+                        textAlign: pw.TextAlign.center,
+                      ),
+                    ),
+                    pw.Expanded(
+                      child: pw.Text(
+                        '\$${(item['line_total'] as num).toStringAsFixed(2)}',
+                        style: pw.TextStyle(
+                          fontWeight: pw.FontWeight.bold,
                         ),
-                        pw.Text(
-                          '\$${(widget.invoiceData['total'] as num).toStringAsFixed(2)}',
-                          style: pw.TextStyle(
-                            fontSize: 16,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                        textAlign: pw.TextAlign.right,
+                      ),
                     ),
                   ],
                 ),
-              ),
+              );
+            }).toList(),
 
-              if (widget.invoiceData['notes'] != null) ...[
-                pw.SizedBox(height: 20),
+            pw.SizedBox(height: 30),
+
+            // Total section
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
                 pw.Text(
-                  'Notes:',
+                  'TOTAL',
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Text(
+                  '\$${(widget.invoiceData['total'] as num).toStringAsFixed(2)}',
+                  style: pw.TextStyle(
+                    fontSize: 20,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromInt(0xFFD4AF37),
+                  ),
+                ),
+                pw.SizedBox(height: 16),
+                pw.Text(
+                  'PAID:',
                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                 ),
-                pw.Text(widget.invoiceData['notes']),
               ],
-            ],
-          );
-        },
-      ),
-    );
+            ),
 
-    // Convert the document to bytes and return as Uint8List
-    return pdf.save();
-  }
+            if (widget.invoiceData['notes'] != null) ...[
+              pw.SizedBox(height: 20),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'Notes:',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.Text(widget.invoiceData['notes']),
+                ],
+              ),
+            ],
+          ],
+        );
+      },
+    ),
+  );
+
+  return pdf.save();
+}
 
   Future<void> _saveInvoice() async {
     setState(() => _isSaving = true);
@@ -1639,258 +1677,365 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Invoice Preview'),
-        backgroundColor: const Color(0xFFD4AF37),
-        actions: [
-          if (widget.existingInvoice == null ||
-              widget.existingInvoice!['status'] != 'saved')
-            IconButton(
-              icon:
-                  _isSaving
-                      ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(color: Colors.white),
-                      )
-                      : const Icon(Icons.save),
-              onPressed: _isSaving ? null : _saveInvoice,
-              tooltip: 'Save Invoice',
-            ),
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('Invoice Preview'),
+      backgroundColor: const Color(0xFFD4AF37),
+      actions: [
+        if (widget.existingInvoice == null ||
+            widget.existingInvoice!['status'] != 'saved')
           IconButton(
-            icon: const Icon(Icons.print),
-            onPressed: () {
-              Printing.layoutPdf(onLayout: (format) => _generatePdf());
-            },
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(color: Colors.white),
+                  )
+                : const Icon(Icons.save),
+            onPressed: _isSaving ? null : _saveInvoice,
+            tooltip: 'Save Invoice',
           ),
-          IconButton(icon: const Icon(Icons.share), onPressed: _shareInvoice),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Invoice Header
-            Container(
-              padding: const EdgeInsets.all(20),
-              color: const Color(0xFFD4AF37).withOpacity(0.1),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
+        IconButton(
+          icon: const Icon(Icons.print),
+          onPressed: () {
+            Printing.layoutPdf(onLayout: (format) => _generatePdf());
+          },
+        ),
+        IconButton(icon: const Icon(Icons.share), onPressed: _shareInvoice),
+      ],
+    ),
+    body: SingleChildScrollView(
+      child: Column(
+        children: [
+          // Header with Invoice Number, Date, and Order Number
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Logo Placeholder - Replace with your actual logo
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.cake,
+                    size: 40,
+                    color: Color(0xFFD4AF37),
+                  ),
+                ),
+                
+                // Invoice Info - Top Right
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Invoice #${widget.invoiceData['id']}',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Issue date: ${DateFormat('MMM dd, yyyy').format(DateTime.parse(widget.invoiceData['created_date']))}',
+                    ),
+                    Text('Order number: ${widget.invoiceData['id']}'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // From and To sections
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // From section
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'INVOICE',
+                        'From:',
                         style: TextStyle(
-                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Ethalle's Cakes and Bakes",
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Text('Invoice #: ${widget.invoiceData['id']}'),
-                      Text(
-                        'Date: ${DateFormat('MMM dd, yyyy').format(DateTime.parse(widget.invoiceData['created_date']))}',
+                      const Text('Illinois'),
+                      const Text('United States'),
+                      const Text('ethallebakes@gmail.com'),
+                      const Text('3126005810'),
+                    ],
+                  ),
+                ),
+
+                // To section
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'To:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
-                      if (widget.existingInvoice != null &&
-                          widget.existingInvoice!['status'] == 'saved')
-                        Container(
-                          margin: const EdgeInsets.only(top: 4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
+                      const SizedBox(height: 8),
+                      if (widget.invoiceData['customer_name'] != null)
+                        Text(
+                          widget.invoiceData['customer_name'],
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'SAVED',
+                        ),
+                      if (widget.invoiceData['customer_email'] != null)
+                        Text(widget.invoiceData['customer_email']),
+                      if (widget.invoiceData['customer_phone'] != null)
+                        Text(_formatPhoneForDisplay(widget.invoiceData['customer_phone'])),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Product/Service Table
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // Table Header
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD4AF37).withOpacity(0.1),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(8),
+                      topRight: Radius.circular(8),
+                    ),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            'Product or Service',
                             style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                    ],
-                  ),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        "Ethalle's Cakes and Bakes",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Text(
+                            'Quantity',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
-                      ),
-                      Text('Bolingbrook, IL 60490'),
-                      Text('ethallebakes@gmail.com'),
-                      Text('312-600-5810'),
-                    ],
+                        Expanded(
+                          child: Text(
+                            'Discount',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Amount',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.right,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
-            ),
+                ),
 
-            // Customer Information
-            if (widget.invoiceData['customer_name'] != null ||
-                widget.invoiceData['customer_email'] != null ||
-                widget.invoiceData['customer_phone'] != null)
-              Container(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Bill To:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                // Table Rows
+                ...widget.items.map((item) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.grey[300]!,
+                          width: 1,
+                        ),
                       ),
                     ),
-                    if (widget.invoiceData['customer_name'] != null)
-                      Text(widget.invoiceData['customer_name']),
-                    if (widget.invoiceData['customer_email'] != null)
-                      Text(widget.invoiceData['customer_email']),
-                    if (widget.invoiceData['customer_phone'] != null)
-                      Text(
-                        _formatPhoneForDisplay(
-                          widget.invoiceData['customer_phone'],
-                        ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item['product_name'],
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (item['description'] != null)
+                                  Text(
+                                    item['description'],
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              item['quantity'].toString(),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              item['discount'] != null && (item['discount'] as num) > 0
+                                  ? '\$${(item['discount'] as num).toStringAsFixed(2)}'
+                                  : '-',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '\$${(item['line_total'] as num).toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                        ],
                       ),
-                  ],
-                ),
-              ),
+                    ),
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
 
-            // Items List
-            Padding(
+          // Total section
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text(
+                  'TOTAL',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '\$${(widget.invoiceData['total'] as num).toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFD4AF37),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'PAID:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Notes
+          if (widget.invoiceData['notes'] != null)
+            Container(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Items',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  ...widget.items.map((item) {
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        title: Text(item['product_name']),
-                        subtitle: Text(
-                          'Date: ${DateFormat('MMM dd, yyyy').format(DateTime.parse(item['sale_date']))}',
-                        ),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text('Qty: ${item['quantity']}'),
-                            Text(
-                              '\$${(item['line_total'] as num).toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFFD4AF37),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ],
-              ),
-            ),
-
-            // Totals
-            Container(
-              padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFFD4AF37)),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                children: [
-                  _buildTotalRow(
-                    'Subtotal',
-                    (widget.invoiceData['subtotal'] as num).toDouble(),
-                  ),
-                  _buildTotalRow(
-                    'Tax Amount',
-                    (widget.invoiceData['tax_amount'] as num).toDouble(),
-                  ),
-                  const Divider(),
-                  _buildTotalRow(
-                    'TOTAL',
-                    (widget.invoiceData['total'] as num).toDouble(),
-                    isTotal: true,
-                  ),
-                ],
-              ),
-            ),
-
-            // Notes
-            if (widget.invoiceData['notes'] != null)
-              Container(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Notes:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                    'Notes:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
-                    Text(widget.invoiceData['notes']),
-                  ],
+                  ),
+                  Text(widget.invoiceData['notes']),
+                ],
+              ),
+            ),
+
+          // Action Buttons
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Printing.layoutPdf(
+                        onLayout: (format) => _generatePdf(),
+                      );
+                    },
+                    icon: const Icon(Icons.print),
+                    label: const Text('Print Invoice'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD4AF37),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
                 ),
-              ),
-
-            // Action Buttons
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Printing.layoutPdf(
-                          onLayout: (format) => _generatePdf(),
-                        );
-                      },
-                      icon: const Icon(Icons.print),
-                      label: const Text('Print Invoice'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD4AF37),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _shareInvoice,
+                    icon: const Icon(Icons.share),
+                    label: const Text('Share Invoice'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _shareInvoice,
-                      icon: const Icon(Icons.share),
-                      label: const Text('Share Invoice'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildTotalRow(String label, double amount, {bool isTotal = false}) {
     return Padding(

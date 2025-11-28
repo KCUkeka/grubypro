@@ -1,10 +1,252 @@
 import 'package:flutter/material.dart';
 import 'package:grubypro/screens/ecb/ecb_home.dart';
 import 'package:grubypro/screens/gruby/grubyhome.dart';
-import 'paypro/paypro_home.dart'; 
+import 'package:grubypro/screens/paypro/paypro_home.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'dart:io' show Platform, HttpClient, HttpException;
+import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
 
-class LandingPage extends StatelessWidget {
+class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
+
+  @override
+  State<LandingPage> createState() => _LandingPageState();
+}
+
+class _LandingPageState extends State<LandingPage> {
+  String _currentVersion = '1.0.0';
+  bool _checkingForUpdates = false;
+  String _platform = 'unknown';
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAppInfo();
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoCheckForUpdates();
+    });
+  }
+
+  Future<void> _initializeAppInfo() async {
+    try {
+      final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+      
+      // Detect platform
+      if (Platform.isAndroid) {
+        _platform = 'android';
+      } else if (Platform.isIOS) {
+        _platform = 'ios';
+      } else if (Platform.isWindows) {
+        _platform = 'windows';
+      } else if (Platform.isMacOS) {
+        _platform = 'macos';
+      } else if (Platform.isLinux) {
+        _platform = 'linux';
+      }
+      
+      setState(() {
+        _currentVersion = packageInfo.version;
+      });
+    } catch (e) {
+      debugPrint('Failed to get package info: $e');
+    }
+  }
+
+  Future<void> _autoCheckForUpdates() async {
+    try {
+      await _checkForUpdates(showDialogIfUpToDate: false);
+    } catch (e) {
+      debugPrint('Auto update check failed: $e');
+    }
+  }
+
+  Future<void> _manualCheckForUpdates() async {
+    await _checkForUpdates(showDialogIfUpToDate: true);
+  }
+
+  Future<void> _checkForUpdates({bool showDialogIfUpToDate = true}) async {
+    if (_checkingForUpdates) return;
+    
+    setState(() {
+      _checkingForUpdates = true;
+    });
+
+    try {
+      final response = await HttpClient().getUrl(
+        Uri.parse('https://raw.githubusercontent.com/KCUkeka/grubypro/main/releases/app-archive.json'),
+      ).then((request) => request.close());
+
+      if (response.statusCode != 200) {
+        throw HttpException('Failed to fetch update info: ${response.statusCode}');
+      }
+      
+      final jsonStr = await response.transform(utf8.decoder).join();
+      final jsonData = jsonDecode(jsonStr);
+      
+      // Find the correct platform item
+      final platformItems = (jsonData['items'] as List)
+          .where((item) => item['platform'] == _platform)
+          .toList();
+          
+      if (platformItems.isEmpty) {
+        throw Exception('No update information available for $_platform');
+      }
+      
+      final latestItem = platformItems.first;
+      final latestVersion = latestItem['version'];
+      
+      if (_isNewerVersion(latestVersion, _currentVersion)) {
+        final downloadUrl = latestItem['url'];
+        final changes = latestItem['changes'] as List;
+        _showUpdateDialog(downloadUrl, latestVersion, changes);
+      } else {
+        if (showDialogIfUpToDate && mounted) {
+          _showUpToDateDialog();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Update check failed: $e")),
+        );
+      }
+      debugPrint("Update check failed: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _checkingForUpdates = false;
+        });
+      }
+    }
+  }
+
+  bool _isNewerVersion(String latest, String current) {
+    try {
+      final latestParts = latest.split('.').map(int.parse).toList();
+      final currentParts = current.split('.').map(int.parse).toList();
+
+      for (int i = 0; i < latestParts.length; i++) {
+        if (i >= currentParts.length) return true;
+        if (latestParts[i] > currentParts[i]) return true;
+        if (latestParts[i] < currentParts[i]) return false;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  void _showUpdateDialog(String downloadUrl, String version, List changes) {
+    String platformName = _getPlatformName();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Update Available'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Version $version is available for $platformName!',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              const Text('What\'s new:'),
+              const SizedBox(height: 5),
+              ...changes
+                  .map(
+                    (change) => Padding(
+                      padding: const EdgeInsets.only(left: 8.0, bottom: 4),
+                      child: Text('• ${change['message']}'),
+                    ),
+                  )
+                  .toList(),
+              const SizedBox(height: 10),
+              Text(
+                'Click "Download Update" to get the latest $platformName version.',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Later'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _launchDownload(downloadUrl);
+            },
+            child: const Text('Download Update'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getPlatformName() {
+    switch (_platform) {
+      case 'android': return 'Android';
+      case 'ios': return 'iOS';
+      case 'windows': return 'Windows';
+      case 'macos': return 'macOS';
+      case 'linux': return 'Linux';
+      default: return 'this platform';
+    }
+  }
+
+  void _showUpToDateDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Up to Date'),
+        content: Text(
+          'You are using the latest version of GrubyPro for ${_getPlatformName()}.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchDownload(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Opening download page...'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not launch $url')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to open download: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,15 +256,28 @@ class LandingPage extends StatelessWidget {
         title: const Text(
           'Choose Your App',
           style: TextStyle(
-            fontWeight: FontWeight.bold, // Makes text bold
-            fontSize: 20, // Optional: Adjust font size if needed
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
           ),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 1,
         foregroundColor: Colors.black87,
-        toolbarHeight: 80, // Increases AppBar height (brings text down)
+        toolbarHeight: 80,
+        actions: [
+          IconButton(
+            icon: _checkingForUpdates 
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.system_update),
+            tooltip: 'Check for Updates',
+            onPressed: _checkingForUpdates ? null : _manualCheckForUpdates,
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
