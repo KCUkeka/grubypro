@@ -13,8 +13,8 @@
       ],
       "date": "2025-11-28",
       "mandatory": false,
-      "url": "https://raw.githubusercontent.com/KCUkeka/grubypro/main/releases/download/v1.0.1/grubypro.apk",
-      "platform": "mobile"
+      "url": "https://github.com/KCUkeka/grubypro/releases/download/v1.0.1/grubypro.apk",
+      "platform": "android"
     },
     {
       "version": "1.0.0",
@@ -27,8 +27,8 @@
       ],
       "date": "2025-08-13",
       "mandatory": false,
-      "url": "https://raw.githubusercontent.com/KCUkeka/grubypro/main/releases/download/v1.0.0/grubypro.apk",
-      "platform": "mobile"
+      "url": "https://github.com/KCUkeka/grubypro/releases/download/v1.0.0/grubypro.apk",
+      "platform": "android"
     }
   ]
 }
