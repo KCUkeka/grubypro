@@ -3,7 +3,7 @@
   "description": "Multi-App Suite: Gruby, PayPro, ECB",
   "items": [
     {
-      "version": "1.0.3",
+      "version": "1.0.2",
       "shortVersion": 3,
       "changes": [
         {
