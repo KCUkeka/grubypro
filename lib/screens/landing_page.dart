@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:grubypro/screens/ecb/ecb_home.dart';
 import 'package:grubypro/screens/gruby/grubyhome.dart';
 import 'package:grubypro/screens/paypro/paypro_home.dart';
+import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
-import 'dart:io' show Platform, HttpClient, HttpException;
+import 'package:flutter/foundation.dart';
+
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -15,7 +17,7 @@ class LandingPage extends StatefulWidget {
 }
 
 class _LandingPageState extends State<LandingPage> {
-  String _currentVersion = '1.0.0';
+  String _currentVersion = '1.0.2';
   bool _checkingForUpdates = false;
   String _platform = 'unknown';
 
@@ -34,17 +36,20 @@ class _LandingPageState extends State<LandingPage> {
       final PackageInfo packageInfo = await PackageInfo.fromPlatform();
       
       // Detect platform
-      if (Platform.isAndroid) {
-        _platform = 'android';
-      } else if (Platform.isIOS) {
-        _platform = 'ios';
-      } else if (Platform.isWindows) {
-        _platform = 'windows';
-      } else if (Platform.isMacOS) {
-        _platform = 'macos';
-      } else if (Platform.isLinux) {
-        _platform = 'linux';
-      }
+    if (kIsWeb) {
+  _platform = 'web';
+} else if (defaultTargetPlatform == TargetPlatform.android) {
+  _platform = 'android';
+} else if (defaultTargetPlatform == TargetPlatform.iOS) {
+  _platform = 'ios';
+} else if (defaultTargetPlatform == TargetPlatform.windows) {
+  _platform = 'windows';
+} else if (defaultTargetPlatform == TargetPlatform.macOS) {
+  _platform = 'macos';
+} else if (defaultTargetPlatform == TargetPlatform.linux) {
+  _platform = 'linux';
+}
+
       
       setState(() {
         _currentVersion = packageInfo.version;
@@ -67,6 +72,11 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   Future<void> _checkForUpdates({bool showDialogIfUpToDate = true}) async {
+    if (kIsWeb) {
+  debugPrint("Skipping update check on Web");
+  return;
+}
+
     if (_checkingForUpdates) return;
     
     setState(() {
@@ -74,16 +84,16 @@ class _LandingPageState extends State<LandingPage> {
     });
 
     try {
-      final response = await HttpClient().getUrl(
-        Uri.parse('https://raw.githubusercontent.com/KCUkeka/grubypro/main/releases/app-archive.json'),
-      ).then((request) => request.close());
+      final response = await http.get(
+  Uri.parse('https://raw.githubusercontent.com/KCUkeka/grubypro/main/releases/app-archive.json'),
+);
 
-      if (response.statusCode != 200) {
-        throw HttpException('Failed to fetch update info: ${response.statusCode}');
-      }
-      
-      final jsonStr = await response.transform(utf8.decoder).join();
-      final jsonData = jsonDecode(jsonStr);
+if (response.statusCode != 200) {
+  throw Exception('Failed to fetch update info');
+}
+
+final jsonData = jsonDecode(response.body);
+
       
       // Find the correct platform item
       final platformItems = (jsonData['items'] as List)

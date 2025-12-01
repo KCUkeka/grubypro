@@ -3,12 +3,26 @@
   "description": "Multi-App Suite: Gruby, PayPro, ECB",
   "items": [
     {
+      "version": "1.0.3",
+      "shortVersion": 3,
+      "changes": [
+        {
+          "type": "feat",
+          "message": "Stable version with added auto-update functionality"
+        }
+      ],
+      "date": "2025-12-01",
+      "mandatory": false,
+      "url": "https://github.com/KCUkeka/grubypro/releases/download/v1.0.2/grubypro.apk",
+      "platform": "android"
+    },
+    {
       "version": "1.0.1",
       "shortVersion": 2,
       "changes": [
         {
           "type": "feat",
-          "message": "Added auto-update functionality"
+          "message": "Added ECB app"
         }
       ],
       "date": "2025-11-28",
